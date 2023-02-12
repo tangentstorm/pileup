@@ -37,9 +37,6 @@
     <button type="submit">post</button>
   </form>
   <div id="posts">
-    <p>scrap</p>
-    <p>tweet</p>
-    <p><img src="/static/hello-stick.svg"/></p>
   </div>
 </div>
 
@@ -51,6 +48,7 @@
 </svg>
 
 <script>
+  // -- drawing the piles --
   let ofsx = 20, boxw = 300, gapw = 10, cols = 3,
       ofsy = 20, boxh = 180, gaph = 10
 
@@ -65,22 +63,26 @@
       return d3.select('#target').style('left',
         `${e.sourceEvent.clientX - 10}px`).style('top', `${e.sourceEvent.clientY -25}px`) }
 
-  let cards = d3.select('#posts').selectAll('p').call(d3.drag()
-    .on('start', function (e,d){
-      d3.select(this).classed('dragging', true)
-      targetToMouse(e,d).style('display','block') })
-    .on('drag', (e,d)=>{ targetToMouse(e,d)
-      // now highlight the pile we'd drop to
-      piles.select('rect').each(function(d,i){
-        let r = this.getBoundingClientRect()
-        let ex = e.sourceEvent.clientX, ey = e.sourceEvent.clientY
-        let over = (ex >= r.x && ex - r.x < r.width) && (ey >= r.y && ey - r.y < r.height)
-        d3.select(this).transition().duration(250).ease(d3.easeLinear).style('fill', over ? '#bb8749' : '') }) })
-    .on('end', function (e,d ){
-        console.log('endin.')
-      d3.select(this).classed('dragging', false)
-      d3.select('#target').style('display','none')
-      piles.select('rect').transition().duration(250).ease(d3.easeLinear).style('fill', '')}))
+
+  // -- the inbox -------
+  fetch('/inbox').then(r=>r.json()).then(data=>{
+    let scraps = d3.select('#posts').selectAll('p').data(data).enter().append('p').html(d=>d.text)
+    scraps.call(d3.drag()
+      .on('start', function (e,d){
+        d3.select(this).classed('dragging', true)
+        targetToMouse(e,d).style('display','block') })
+      .on('drag', (e,d)=>{ targetToMouse(e,d)
+        // now highlight the pile we'd drop to
+        piles.select('rect').each(function(d,i){
+          let r = this.getBoundingClientRect()
+          let ex = e.sourceEvent.clientX, ey = e.sourceEvent.clientY
+          let over = (ex >= r.x && ex - r.x < r.width) && (ey >= r.y && ey - r.y < r.height)
+          d3.select(this).transition().duration(250).ease(d3.easeLinear).style('fill', over ? '#bb8749' : '') }) })
+      .on('end', function (e,d ){
+          console.log('endin.')
+        d3.select(this).classed('dragging', false)
+        d3.select('#target').style('display','none')
+        piles.select('rect').transition().duration(250).ease(d3.easeLinear).style('fill', '')})) })
 
 </script>
 </body>

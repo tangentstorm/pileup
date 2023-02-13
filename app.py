@@ -1,7 +1,7 @@
 """
 pileup web backend. mostly middleware to couchdb.
 """
-from quart import Quart
+from quart import Quart, request
 import config
 
 app = Quart(__name__)
@@ -18,9 +18,14 @@ async def index():
     return await app.send_static_file('index.html')
 
 
-@app.route('/inbox')
+@app.route('/inbox', methods=['GET', 'POST'])
 async def inbox():
-    return (await app.client.find({'pile': '@inbox'}))['docs']
+    match request.method:
+        case 'GET':
+            return (await app.client.find({'pile': '@inbox'}))['docs']
+        case 'POST':
+            text = (await request.json).get('text')
+            return await app.client.add_scrap(text)
 
 
 if __name__ == '__main__':

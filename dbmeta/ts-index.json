@@ -1,0 +1,23 @@
+{
+  "_id": "_design/03839c47b1fdb5a0c50a860ddeaaff63bebce1dc",
+  "_rev": "1-8e432c9a5a9e43b896670fefb6f7811c",
+  "language": "query",
+  "views": {
+    "foo-json-index": {
+      "map": {
+        "fields": {
+          "ts": "asc"
+        },
+        "partial_filter_selector": {}
+      },
+      "reduce": "_count",
+      "options": {
+        "def": {
+          "fields": [
+            "ts"
+          ]
+        }
+      }
+    }
+  }
+}

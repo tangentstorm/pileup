@@ -32,9 +32,9 @@
 
 <div id="stream">
   <form id="notepad">
-    <textarea rows="8" cols="48"></textarea>
+    <textarea name="text" rows="8" cols="48"></textarea>
     <br/>
-    <button type="submit">post</button>
+    <button type="button" onclick="addScrap()">post</button>
   </form>
   <div id="posts">
   </div>
@@ -48,12 +48,14 @@
 </svg>
 
 <script>
+
+  let model = {scraps:[], piles:['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']}
+
   // -- drawing the piles --
   let ofsx = 20, boxw = 300, gapw = 10, cols = 3,
       ofsy = 20, boxh = 180, gaph = 10
 
-  let names = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']
-  let piles = d3.select("#canvas").selectAll('g').data(names)
+  let piles = d3.select("#canvas").selectAll('g').data(model.piles)
     .enter().append('g').attr('class','pile').attr('transform', (d,i)=>
       `translate(${ofsx+i%cols*(boxw+gapw)},${ofsy+Math.floor(i/cols)*(boxh+gaph)})`)
   piles.append('rect').attr('width', boxw).attr('height', boxh)
@@ -65,9 +67,11 @@
 
 
   // -- the inbox -------
-  fetch('/inbox').then(r=>r.json()).then(data=>{
-    let scraps = d3.select('#posts').selectAll('p').data(data).enter().append('p').html(d=>d.text)
-    scraps.call(d3.drag()
+
+  function drawScraps() {
+    let scraps = d3.select('#posts').selectAll('p')
+    let newScraps = scraps.data(model.scraps, d=>d._id).enter().append('p').html(d=>d.text)
+    newScraps.call(d3.drag()
       .on('start', function (e,d){
         d3.select(this).classed('dragging', true)
         targetToMouse(e,d).style('display','block') })
@@ -82,7 +86,18 @@
           console.log('endin.')
         d3.select(this).classed('dragging', false)
         d3.select('#target').style('display','none')
-        piles.select('rect').transition().duration(250).ease(d3.easeLinear).style('fill', '')})) })
+        piles.select('rect').transition().duration(250).ease(d3.easeLinear).style('fill', '')})) }
+
+  fetch('/inbox').then(r=>r.json()).then(data=>{ model.scraps = data; drawScraps() })
+
+  function addScrap() {
+    let text = document.getElementById('notepad').text.value;
+    fetch('/inbox',
+      {method:'POST', headers: { 'Content-Type': 'application/json'},
+      body: JSON.stringify({text}) })
+    .then(r=>r.json()).then(res=>{
+      model.scraps.unshift({_id: res._id, text})
+      drawScraps() }) }
 
 </script>
 </body>

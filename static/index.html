@@ -56,7 +56,10 @@
 <script>
 
   const HOME = '@inbox'
-  let model = {scraps:[], piles:[], pile:null, crumbs:[]}
+  // !! if we start at #foo and foo is not a child of @home, the
+  //    crumbs will still say HOME -> foo. The alternative would
+  //    be to calculate all of foo's ancestors. (TODO?)
+  let model = {scraps:[], piles:[], pile:null, crumbs:[HOME]} // pile initialized in gotoPile at bottom
   let cached = {piles:[]}
 
   // -- drawing the piles ------------------------------------

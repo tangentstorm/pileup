@@ -102,14 +102,16 @@
         cached.piles.select('rect').each(function(d,i){
           d3.select(this).transition().duration(250).ease(d3.easeLinear)
             .style('fill', isOver(this, e) ? '#bb8749' : '') }) })
-      .on('end', function (e, d){
-        d3.select(this).classed('dragging', false)
+      .on('end', function (e, d, i){
+        let el = d3.select(this).classed('dragging', false)
         d3.select('#ghost').style('display','none')
         cached.piles.select('rect').transition().duration(250).ease(d3.easeLinear).style('fill', '')
         let target = cached.piles.select('rect').filter(function(){return isOver(this, e)})
         if (target.size()) {
           let pile = target.data()[0];
-          jFetch(`/s/${d._id}`, 'PUT', {pile}) } })) }
+          jFetch(`/s/${d._id}`, 'PUT', {pile})
+          model.scraps.pop(i)
+          el.remove() } })) }
 
   function addScrap() {
     let text = document.getElementById('notepad').text.value;

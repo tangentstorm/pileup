@@ -10,8 +10,8 @@ class CouchDBClient:
         self.sess = aiohttp.ClientSession()
         self.url = f'http://{user}:{pswd}@{host}:{port}/{db}'
 
-    async def find(self, selector, **kw):
-        q = {'selector': selector, 'sort': [{'ts': 'desc'}]}
+    async def find(self, selector=None, **kw):
+        q = {'selector': selector or kw, 'sort': [{'ts': 'desc'}]}
         async with self.sess.post(f'{self.url}/_find', json=q) as r:
             return await r.json()
 

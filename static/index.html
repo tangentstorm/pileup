@@ -68,7 +68,7 @@
         `translate(${ofsx+i%cols*(boxw+gapw)},${ofsy+Math.floor(i/cols)*(boxh+gaph)})`)
     p.append('rect').attr('width', boxw).attr('height', boxh)
     p.append('text').attr('class','pile-name').attr('x',10).attr('y',20)
-      .append('a').on('click', (e,d)=>gotoPile(d.name)).text(d=>d.name) }
+      .append('a').on('click', (e,d)=>gotoPile(d.text)).text(d=>d.text) }
 
   function ghostToMouse(e,d) {
       return d3.select('#ghost').style('left',
@@ -105,9 +105,9 @@
         d3.select('#ghost').style('display','none')
         cached.piles.select('rect').transition().duration(250).ease(d3.easeLinear).style('fill', '')
         let target = cached.piles.select('rect').filter(function(){return isOver(this, e)})
-        if (target.size()) {
+        if (target.size()) { // -- dragged scrap to a pile
           let pile = target.data()[0];
-          jFetch(`/s/${d._id}`, 'PUT', {pile: pile.name})
+          jFetch(`/s/${d._id}`, 'PUT', {pile: pile._id})
           model.scraps.pop(i)
           el.remove() } })) }
 

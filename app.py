@@ -6,12 +6,14 @@ import config
 
 app = Quart(__name__)
 
+
 @app.before_serving
 async def startup():
     app.client = await config.get_client()
     # making any request seems to "warm up" the underlying aiohttp client.
     # otherwise there's a slight delay on the first request
     await app.client.sess.get(app.client.url)
+
 
 @app.route('/')
 async def index():
@@ -23,10 +25,18 @@ async def index():
 async def inbox(pile):
     match request.method:
         case 'GET':
-            return (await app.client.find({'pile': pile}))['docs']
+            if pile == '@inbox':
+                return (await app.client.find(pile='@inbox'))['docs']
+            piles = (await app.client.find(type='pile', text=pile))['docs']
+            if not piles:
+                print("no such pile:", pile)
+                return []
+            # !! what if there's more than one pile with this name? (force unique?)
+            return (await app.client.find({'pile': piles[0]['_id']}))['docs']
         case 'POST':
             text = (await request.json).get('text')
             return await app.client.add_scrap(text, pile)
+
 
 @app.route('/s/<sid>', methods=['GET', 'PUT'])
 async def scrap(sid):

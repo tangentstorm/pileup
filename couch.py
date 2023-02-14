@@ -19,3 +19,7 @@ class CouchDBClient:
         when = datetime.now().isoformat()
         async with self.sess.post(f'{self.url}', json={'text': text, 'pile': pile, 'ts': when}) as r:
             return await r.json()
+
+    async def put(self, path, **obj):
+        async with self.sess.put(f'{self.url}/{path}', json=obj) as r:
+            return await r.json()

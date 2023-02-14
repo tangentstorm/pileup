@@ -19,7 +19,7 @@
     .pile rect.droptarget { fill: #bb8749 } /* dummy rule for color skittle in editor */
     .pile-name { font-weight: bold }
     body { font-family: "Calibri" }
-    #target { position:absolute; left: 0; top:0; width:100px; height: 60px; z-index: 1;
+    #ghost { position:absolute; left: 0; top:0; width:100px; height: 60px; z-index: 1;
         background: white; border:solid #333 1px; opacity: 90%; display:none;
         box-shadow: #00000033 5px 5px 3px 3px; }
   </style>
@@ -40,7 +40,7 @@
   </div>
 </div>
 
-<div id="target">
+<div id="ghost">
 </div>
 
 <svg id="canvas">
@@ -49,24 +49,38 @@
 
 <script>
 
-  let model = {scraps:[], piles:['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine']}
+  let model = {scraps:[], piles:[]}
+  let cached = {piles:[]}
 
   // -- drawing the piles --
   let ofsx = 20, boxw = 300, gapw = 10, cols = 3,
       ofsy = 20, boxh = 180, gaph = 10
 
-  let piles = d3.select("#canvas").selectAll('g').data(model.piles)
-    .enter().append('g').attr('class','pile').attr('transform', (d,i)=>
-      `translate(${ofsx+i%cols*(boxw+gapw)},${ofsy+Math.floor(i/cols)*(boxh+gaph)})`)
-  piles.append('rect').attr('width', boxw).attr('height', boxh)
-  piles.append('text').attr('class','pile-name').attr('x',10).attr('y',20).text(d=>d)
+  function getPiles() { return d3.select("#canvas").selectAll('g').data(model.piles) }
+  function drawPiles() {
+    let piles = getPiles().enter().append('g').attr('class','pile').attr('transform', (d,i)=>
+        `translate(${ofsx+i%cols*(boxw+gapw)},${ofsy+Math.floor(i/cols)*(boxh+gaph)})`)
+    piles.append('rect').attr('width', boxw).attr('height', boxh)
+    piles.append('text').attr('class','pile-name').attr('x',10).attr('y',20).text(d=>d.name)
+    cached.piles = piles }
 
-  function targetToMouse(e,d) {
-      return d3.select('#target').style('left',
+  function ghostToMouse(e,d) {
+      return d3.select('#ghost').style('left',
         `${e.sourceEvent.clientX - 10}px`).style('top', `${e.sourceEvent.clientY -25}px`) }
 
-
   // -- the inbox -------
+
+  function isOver(elem, e) {
+    let r = elem.getBoundingClientRect()
+    let ex = e.sourceEvent.clientX, ey = e.sourceEvent.clientY
+    return (ex >= r.x && ex - r.x < r.width) && (ey >= r.y && ey - r.y < r.height) }
+
+  function jFetch(url, method, body) {
+    var req;
+    if (method=='GET' || !method) { req = fetch(url) }
+    else { req = fetch(url,
+      {method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)}) }
+    return req.then(res=>res.json()) }
 
   function drawScraps() {
     let scraps = d3.select('#posts').selectAll('p')
@@ -74,30 +88,33 @@
     newScraps.call(d3.drag()
       .on('start', function (e,d){
         d3.select(this).classed('dragging', true)
-        targetToMouse(e,d).style('display','block') })
-      .on('drag', (e,d)=>{ targetToMouse(e,d)
+        ghostToMouse(e,d).style('display','block') })
+      .on('drag', (e,d)=>{ ghostToMouse(e,d)
         // now highlight the pile we'd drop to
-        piles.select('rect').each(function(d,i){
-          let r = this.getBoundingClientRect()
-          let ex = e.sourceEvent.clientX, ey = e.sourceEvent.clientY
-          let over = (ex >= r.x && ex - r.x < r.width) && (ey >= r.y && ey - r.y < r.height)
-          d3.select(this).transition().duration(250).ease(d3.easeLinear).style('fill', over ? '#bb8749' : '') }) })
-      .on('end', function (e,d ){
-          console.log('endin.')
+        cached.piles.select('rect').each(function(d,i){
+          d3.select(this).transition().duration(250).ease(d3.easeLinear)
+            .style('fill', isOver(this, e) ? '#bb8749' : '') }) })
+      .on('end', function (e, d){
         d3.select(this).classed('dragging', false)
-        d3.select('#target').style('display','none')
-        piles.select('rect').transition().duration(250).ease(d3.easeLinear).style('fill', '')})) }
-
-  fetch('/inbox').then(r=>r.json()).then(data=>{ model.scraps = data; drawScraps() })
+        d3.select('#ghost').style('display','none')
+        cached.piles.select('rect').transition().duration(250).ease(d3.easeLinear).style('fill', '')
+        let target = cached.piles.select('rect').filter(function(){return isOver(this, e)})
+        if (target.size()) {
+          let pile = target.data()[0];
+          jFetch(`/s/${d._id}`, 'PUT', {pile}) } })) }
 
   function addScrap() {
     let text = document.getElementById('notepad').text.value;
-    fetch('/inbox',
-      {method:'POST', headers: { 'Content-Type': 'application/json'},
-      body: JSON.stringify({text}) })
-    .then(r=>r.json()).then(res=>{
+    jfetch('/p/@inbox', 'POST', {text}).then(res=>{
       model.scraps.unshift({_id: res._id, text})
       drawScraps() }) }
+
+  jFetch('/p/@inbox').then(data=>{
+      for (var item of data) {
+        switch(item.type) {
+          case 'pile': model.piles.push(item); break;
+          default: model.scraps.push(item) }}
+      drawPiles(); drawScraps() })
 
 </script>
 </body>

@@ -18,14 +18,28 @@ async def index():
     return await app.send_static_file('index.html')
 
 
-@app.route('/inbox', methods=['GET', 'POST'])
-async def inbox():
+@app.route('/p/', defaults={'pile': '@inbox'})
+@app.route('/p/<pile>', methods=['GET', 'POST'])
+async def inbox(pile):
     match request.method:
         case 'GET':
-            return (await app.client.find({'pile': '@inbox'}))['docs']
+            return (await app.client.find({'pile': pile}))['docs']
         case 'POST':
             text = (await request.json).get('text')
-            return await app.client.add_scrap(text)
+            return await app.client.add_scrap(text, pile)
+
+@app.route('/s/<sid>', methods=['GET', 'PUT'])
+async def scrap(sid):
+    docs = (await app.client.find({'_id': sid}))['docs']
+    res = docs[0] if docs else {}
+    print(res)
+    if res and request.method == 'PUT':
+        # only thing you can edit is the pile (for now?)
+        req = await request.json
+        if pile := req.get('pile'):
+            res['pile'] = pile
+            res = await app.client.put(sid, **res)
+    return res
 
 
 if __name__ == '__main__':

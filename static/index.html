@@ -24,8 +24,9 @@
         box-shadow: #00000033 5px 5px 3px 3px; }
     #crumbs { display: inline-block; padding:0; margin:0; position:relative; top:-15px; }
     #crumbs li { display: inline; }
-    #crumbs li:before { content: " → "; font-family: "consolas" }
+    #crumbs li:before { content: " → "; font-family: "consolas"; color: white !important; }
     #crumbs li:first-child:before { content: " " }
+    #crumbs li:hover, .pile a:hover { cursor: pointer }
   </style>
 </head>
 <body>
@@ -33,8 +34,6 @@
 <nav>
   <img src="/static/pileup-logo.svg"/>
   <ul id="crumbs">
-    <li>[home]</li>
-    <li>seven</li>
   </ul>
 </nav>
 
@@ -52,31 +51,30 @@
 </div>
 
 <svg id="canvas">
-
 </svg>
 
 <script>
 
-  let model = {scraps:[], piles:[]}
+  let model = {scraps:[], piles:[], pile:null, crumbs:[]}
   let cached = {piles:[]}
 
-  // -- drawing the piles --
-  let ofsx = 20, boxw = 300, gapw = 10, cols = 3,
-      ofsy = 20, boxh = 180, gaph = 10
+  // -- drawing the piles ------------------------------------
 
   function getPiles() { return d3.select("#canvas").selectAll('g').data(model.piles) }
   function drawPiles() {
-    let piles = getPiles().enter().append('g').attr('class','pile').attr('transform', (d,i)=>
+    let ofsx = 20, boxw = 300, gapw = 10, cols = 3,
+        ofsy = 20, boxh = 180, gaph = 10
+    let p = cached.piles = getPiles().join('g').attr('class','pile').attr('transform', (d,i)=>
         `translate(${ofsx+i%cols*(boxw+gapw)},${ofsy+Math.floor(i/cols)*(boxh+gaph)})`)
-    piles.append('rect').attr('width', boxw).attr('height', boxh)
-    piles.append('text').attr('class','pile-name').attr('x',10).attr('y',20).text(d=>d.name)
-    cached.piles = piles }
+    p.append('rect').attr('width', boxw).attr('height', boxh)
+    p.append('text').attr('class','pile-name').attr('x',10).attr('y',20)
+      .append('a').on('click', (e,d)=>gotoPile(d.name)).text(d=>d.name) }
 
   function ghostToMouse(e,d) {
       return d3.select('#ghost').style('left',
         `${e.sourceEvent.clientX - 10}px`).style('top', `${e.sourceEvent.clientY -25}px`) }
 
-  // -- the inbox -------
+  // -- the inbox --------------------------------------------
 
   function isOver(elem, e) {
     let r = elem.getBoundingClientRect()
@@ -92,7 +90,7 @@
 
   function drawScraps() {
     let scraps = d3.select('#posts').selectAll('p')
-    let newScraps = scraps.data(model.scraps, d=>d._id).enter().append('p').html(d=>d.text)
+    let newScraps = scraps.data(model.scraps, d=>d._id).join('p').html(d=>d.text)
     newScraps.call(d3.drag()
       .on('start', function (e,d){
         d3.select(this).classed('dragging', true)
@@ -109,7 +107,7 @@
         let target = cached.piles.select('rect').filter(function(){return isOver(this, e)})
         if (target.size()) {
           let pile = target.data()[0];
-          jFetch(`/s/${d._id}`, 'PUT', {pile})
+          jFetch(`/s/${d._id}`, 'PUT', {pile: pile.name})
           model.scraps.pop(i)
           el.remove() } })) }
 
@@ -119,12 +117,28 @@
       model.scraps.unshift({_id: res._id, text})
       drawScraps() }) }
 
-  jFetch('/p/@inbox').then(data=>{
-      for (var item of data) {
-        switch(item.type) {
-          case 'pile': model.piles.push(item); break;
-          default: model.scraps.push(item) }}
-      drawPiles(); drawScraps() })
+  function drawCrumbs() {
+    d3.select('#crumbs').selectAll('li').data(model.crumbs).join('li').text(d=>d)
+      .on('click', (e,d) => { if (d != model.pile) gotoPile(d) })}
+
+  function gotoPile(which) {
+    if (which != model.pile) {
+      let ix = model.crumbs.indexOf(which)
+      if (ix > -1) { model.crumbs = model.crumbs.slice(0, ix + 1) } // jump to crumb
+      else { model.crumbs.push(which) }
+      model.pile = which
+      drawCrumbs() }
+    model.scraps = []; model.piles = [];
+    jFetch(`/p/${which}`).then(data=>{
+        for (var item of data) {
+          switch(item.type) {
+            case 'pile': model.piles.push(item); break;
+            default: model.scraps.push(item) }}
+        drawPiles(); drawScraps() }) }
+
+  // -- begin ------------------------------------------------
+
+  gotoPile(document.location.hash.substr(1) || '@inbox')
 
 </script>
 </body>

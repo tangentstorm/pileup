@@ -62,12 +62,12 @@
   // -- drawing the piles ------------------------------------
 
   function getPiles(sel) {
-    let piles = model.piles; if (model.pile != HOME) piles = [...piles, {text:HOME}] // link back to top
+    let piles = model.piles; if (model.pile != HOME) piles = [...piles, {_id:HOME, text:HOME}]
     return d3.select("#canvas").selectAll(sel||'g').data(piles) }
   function drawPiles() {
     let ofsx = 20, boxw = 300, gapw = 10, cols = 3,
         ofsy = 20, boxh = 180, gaph = 10
-    cached.piles = getPiles()
+    getPiles()
       .join(enter => {
           let g = enter.append('g').attr('class','pile').attr('transform', (d,i)=>
             `translate(${ofsx+i%cols*(boxw+gapw)},${ofsy+Math.floor(i/cols)*(boxh+gaph)})`)
@@ -96,20 +96,21 @@
   function drawScraps() {
     let scraps = d3.select('#posts').selectAll('p')
     let newScraps = scraps.data(model.scraps, d=>d._id).join('p').html(d=>d.text)
+    let cachedPiles = getPiles()
     newScraps.call(d3.drag()
       .on('start', function (e,d){
         d3.select(this).classed('dragging', true)
         ghostToMouse(e,d).style('display','block') })
       .on('drag', (e,d)=>{ ghostToMouse(e,d)
         // now highlight the pile we'd drop to
-        cached.piles.select('rect').each(function(d,i){
+        cachedPiles.select('rect').each(function(d,i){
           d3.select(this).transition().duration(250).ease(d3.easeLinear)
             .style('fill', isOver(this, e) ? '#bb8749' : '') }) })
       .on('end', function (e, d, i){
         let el = d3.select(this).classed('dragging', false)
         d3.select('#ghost').style('display','none')
-        cached.piles.select('rect').transition().duration(250).ease(d3.easeLinear).style('fill', '')
-        let target = cached.piles.select('rect').filter(function(){return isOver(this, e)})
+        cachedPiles.select('rect').transition().duration(250).ease(d3.easeLinear).style('fill', '')
+        let target = cachedPiles.select('rect').filter(function(){return isOver(this, e)})
         if (target.size()) { // -- dragged scrap to a pile
           let pile = target.data()[0];
           jFetch(`/s/${d._id}`, 'PUT', {pile: pile._id})
@@ -117,9 +118,10 @@
           el.remove() } })) }
 
   function addScrap() {
-    let text = document.getElementById('notepad').text.value;
+    let scrap = document.getElementById('notepad').text, text = scrap.value
     jFetch(`/p/${model.pile}`, 'POST', {text}).then(res=>{
-      model.scraps.unshift({_id: res._id, text})
+      scrap.value = ''
+      model.scraps.unshift({_id: res.id, text})
       drawScraps() }) }
 
   function drawCrumbs() {

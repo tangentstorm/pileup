@@ -105,7 +105,7 @@
 
   function addScrap() {
     let text = document.getElementById('notepad').text.value;
-    jfetch('/p/@inbox', 'POST', {text}).then(res=>{
+    jFetch('/p/@inbox', 'POST', {text}).then(res=>{
       model.scraps.unshift({_id: res._id, text})
       drawScraps() }) }
 

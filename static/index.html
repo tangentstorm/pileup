@@ -55,20 +55,25 @@
 
 <script>
 
+  const HOME = '@inbox'
   let model = {scraps:[], piles:[], pile:null, crumbs:[]}
   let cached = {piles:[]}
 
   // -- drawing the piles ------------------------------------
 
-  function getPiles() { return d3.select("#canvas").selectAll('g').data(model.piles) }
+  function getPiles(sel) {
+    let piles = model.piles; if (model.pile != HOME) piles = [...piles, {text:HOME}] // link back to top
+    return d3.select("#canvas").selectAll(sel||'g').data(piles) }
   function drawPiles() {
     let ofsx = 20, boxw = 300, gapw = 10, cols = 3,
         ofsy = 20, boxh = 180, gaph = 10
-    let p = cached.piles = getPiles().join('g').attr('class','pile').attr('transform', (d,i)=>
-        `translate(${ofsx+i%cols*(boxw+gapw)},${ofsy+Math.floor(i/cols)*(boxh+gaph)})`)
-    p.append('rect').attr('width', boxw).attr('height', boxh)
-    p.append('text').attr('class','pile-name').attr('x',10).attr('y',20)
-      .append('a').on('click', (e,d)=>gotoPile(d.text)).text(d=>d.text) }
+    cached.piles = getPiles()
+      .join(enter => {
+          let g = enter.append('g').attr('class','pile').attr('transform', (d,i)=>
+            `translate(${ofsx+i%cols*(boxw+gapw)},${ofsy+Math.floor(i/cols)*(boxh+gaph)})`)
+          g.append('rect').attr('width', boxw).attr('height', boxh)
+          g.append('text').attr('class','pile-name').attr('x',10).attr('y',20).append('a')})
+    getPiles('g text a').text(d=>d.text).on('click', (e,d)=>gotoPile(d.text)) }
 
   function ghostToMouse(e,d) {
       return d3.select('#ghost').style('left',
@@ -113,7 +118,7 @@
 
   function addScrap() {
     let text = document.getElementById('notepad').text.value;
-    jFetch('/p/@inbox', 'POST', {text}).then(res=>{
+    jFetch(`/p/${model.pile}`, 'POST', {text}).then(res=>{
       model.scraps.unshift({_id: res._id, text})
       drawScraps() }) }
 
@@ -122,6 +127,7 @@
       .on('click', (e,d) => { if (d != model.pile) gotoPile(d) })}
 
   function gotoPile(which) {
+    document.location.hash = (which==HOME) ? '' : `#${which}`
     if (which != model.pile) {
       let ix = model.crumbs.indexOf(which)
       if (ix > -1) { model.crumbs = model.crumbs.slice(0, ix + 1) } // jump to crumb
@@ -138,7 +144,7 @@
 
   // -- begin ------------------------------------------------
 
-  gotoPile(document.location.hash.substr(1) || '@inbox')
+  gotoPile(document.location.hash.substr(1) || HOME)
 
 </script>
 </body>

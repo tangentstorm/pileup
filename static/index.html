@@ -16,6 +16,7 @@
     #canvas { position: absolute; left:400px; width: calc(100% - 400px); top: 50px; background: cadetblue;
         height: calc(100% - 50px ); }
     .pile rect { fill: bisque; filter: drop-shadow(3px 5px 2px rgb(0 0 0 / 0.4)) }
+    .pile.home rect { fill: #96e9cf }
     .pile rect.droptarget { fill: #bb8749 } /* dummy rule for color skittle in editor */
     .pile-name { font-weight: bold }
     body { font-family: "Calibri" }
@@ -76,7 +77,9 @@
             `translate(${ofsx+i%cols*(boxw+gapw)},${ofsy+Math.floor(i/cols)*(boxh+gaph)})`)
           g.append('rect').attr('width', boxw).attr('height', boxh)
           g.append('text').attr('class','pile-name').attr('x',10).attr('y',20).append('a')})
-    getPiles('g text a').text(d=>d.text).on('click', (e,d)=>gotoPile(d.text)) }
+    // !! why can i not just do .selectAll('text a') here?
+    getPiles('g text a').text(d=>d.text).on('click', (e,d)=>gotoPile(d.text))
+    getPiles().classed('home',d=>d.text==HOME).select('rect').attr('height',d=>d.text==HOME?boxh/2:boxh) }
 
   function ghostToMouse(e,d) {
       return d3.select('#ghost').style('left',

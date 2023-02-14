@@ -23,16 +23,16 @@ async def index():
 @app.route('/p/', defaults={'pile': '@inbox'})
 @app.route('/p/<pile>', methods=['GET', 'POST'])
 async def inbox(pile):
+    if pile != '@inbox':
+        piles = (await app.client.find(type='pile', text=pile))['docs']
+        if not piles:
+            print("no such pile:", pile)
+            return []
+        # !! what if there's more than one pile with this name? (force unique?)
+        pile = piles[0]['_id']
     match request.method:
         case 'GET':
-            if pile == '@inbox':
-                return (await app.client.find(pile='@inbox'))['docs']
-            piles = (await app.client.find(type='pile', text=pile))['docs']
-            if not piles:
-                print("no such pile:", pile)
-                return []
-            # !! what if there's more than one pile with this name? (force unique?)
-            return (await app.client.find({'pile': piles[0]['_id']}))['docs']
+            return (await app.client.find(pile=pile))['docs']
         case 'POST':
             text = (await request.json).get('text')
             return await app.client.add_scrap(text, pile)

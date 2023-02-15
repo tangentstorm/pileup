@@ -28,6 +28,11 @@
     #crumbs li:before { content: " → "; font-family: "consolas"; color: white !important; }
     #crumbs li:first-child:before { content: " " }
     #crumbs li:hover, .pile a:hover { cursor: pointer }
+    #ctx-menu { position:absolute; left:0; top:0; margin:0; background:#333; color: white; }
+    .ctx { padding: 0; border: 0; filter: drop-shadow(3px 5px 2px rgb(0 0 0 / 0.4)) }
+    .ctx ul { padding: 0; margin: 0; }
+    .ctx li { display: block; padding:5px; margin:0; }
+    .ctx li:hover { background: #444; cursor: default }
   </style>
 </head>
 <body>
@@ -53,6 +58,10 @@
 
 <svg id="canvas">
 </svg>
+
+<dialog id="ctx-menu" class="ctx">
+  <ul></ul>
+</dialog>
 
 <script>
 
@@ -148,7 +157,33 @@
           switch(item.type) {
             case 'pile': model.piles.push(item); break;
             default: model.scraps.push(item) }}
-        drawPiles(); drawScraps() }) }
+        drawPiles(); drawScraps(); addMenus() }) }
+
+
+  // -- menus -----------------------------------------------
+
+  function ctxMenu(x,y,node) {
+    let d = node.__data__,
+        menu = d3.select('#ctx-menu')
+          .style('left', `${x}px`).style('top', `${y}px`),
+        options = [`tag: ${node.tagName}`]
+    if (d) options.unshift(`type: ${d.type ? d.type : 'scrap'}`, `id: ${d._id}`)
+    menu.selectAll('li').data(options).join('li').text(d=>d)
+    menu.node().show() }
+
+  function addMenus() {
+    d3.selectAll('#canvas, #posts p, #canvas g').on('click', function(e) {
+        d3.select('#ctx-menu').node().close()
+        e.preventDefault(); })
+      .on('contextmenu', function(e) {
+        // !! phase 2 is the 'target' phase for dom events, when it hits the actual element
+        //    (without this check, #canvas would override rect events in phase 3 ('bubbling'))
+        if (e.eventPhase > 2 && this.tagName == 'svg') return;
+        ctxMenu(e.clientX, e.clientY, this)
+        e.preventDefault() })
+      .on('mousedown', function(e) {
+        if (e.button == 1) {
+          console.log(`middle-click: x: ${e.clientX}, y: ${e.clientY}`) }}) }
 
   // -- begin ------------------------------------------------
 

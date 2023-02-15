@@ -75,7 +75,7 @@
   // -- drawing the piles ------------------------------------
 
   function getPiles(sel) {
-    let piles = model.piles; if (model.pile != HOME) piles = [...piles, {_id:HOME, text:HOME}]
+    let piles = model.piles; if (model.pile?._id != HOME) piles = [...piles, {_id:HOME, text:HOME}]
     return d3.select("#canvas").selectAll(sel||'g').data(piles) }
   function drawPiles() {
     let ofsx = 20, boxw = 300, gapw = 10, cols = 3,
@@ -134,26 +134,27 @@
 
   function addScrap() {
     let scrap = document.getElementById('notepad').text, text = scrap.value
-    jFetch(`/p/${model.pile}`, 'POST', {text}).then(res=>{
+    jFetch(`/p/${model.pile._id}`, 'POST', {text}).then(res=>{
       scrap.value = ''
       model.scraps.unshift({_id: res.id, text})
       drawScraps() }) }
 
   function drawCrumbs() {
     d3.select('#crumbs').selectAll('li').data(model.crumbs).join('li').text(d=>d)
-      .on('click', (e,d) => { if (d != model.pile) gotoPile(d) })}
+      .on('click', (e,d) => { if (d != model.pile._id) gotoPile(d) })}
 
   function gotoPile(which) {
     document.location.hash = (which==HOME) ? '' : `#${which}`
-    if (which != model.pile) {
+    if (which != model.pile?._id) {
       let ix = model.crumbs.indexOf(which)
       if (ix > -1) { model.crumbs = model.crumbs.slice(0, ix + 1) } // jump to crumb
       else { model.crumbs.push(which) }
-      model.pile = which
+      model.pile = {_id: which} // temp
       drawCrumbs() }
     model.scraps = []; model.piles = [];
     jFetch(`/p/${which}`).then(data=>{
-        for (var item of data) {
+        model.pile = data
+        for (var item of data.items) {
           switch(item.type) {
             case 'pile': model.piles.push(item); break;
             default: model.scraps.push(item) }}

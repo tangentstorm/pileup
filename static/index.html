@@ -91,7 +91,7 @@
     let ex = e.sourceEvent.clientX, ey = e.sourceEvent.clientY
     return (ex >= r.x && ex - r.x < r.width) && (ey >= r.y && ey - r.y < r.height) }
 
-  // -- drawing the piles ------------------------------------
+  // -- drawing the scene ------------------------------------
 
   pileData = ()=>(model.pile?._id == HOME) ? model.piles : [...model.piles, {_id:HOME, text:HOME}]
   getPiles = sel=> d3.select("#canvas").selectAll(sel||'g').data(pileData())
@@ -107,7 +107,7 @@
       text: d.text })) }
 
   function drawScene(scene) {
-    d3.select('#canvas').selectAll('g').data(scene)
+    return d3.select('#canvas').selectAll('g').data(scene)
       .join('g')
         .attr('class',d=>d.c||'node').attr('transform', d=>`translate(${d.x},${d.y})`)
         .html((d,i)=>`
@@ -116,18 +116,32 @@
       .each(function() { d3.select(this).select('text a').on('click', (e,d)=>gotoPile(d.text)) })
       .classed('home',d=>d._id==HOME) }
 
-  function ghostToMouse(e,d) {
+  function addScrapToScene(scrap, at) {
+    console.log('addscrap', scrap, at)
+    let scene = model.pile.scene
+    let card = {_id: scrap._id, c:"card", ...at, w:200, h:30, text:scrap.text }
+    scene.push(card) // !! draw twice. second time we'll know the correct width
+    let newCard = drawScene(scene).filter(d=>d._id == scrap._id)
+    card.w = 20 + Math.round(newCard.select('text').node().getBBox().width)
+    drawScene(scene) }
+
+  // -- the inbox --------------------------------------------
+
+  function ghostToMouse(e,d) { // move "ghost" when dragging scraps from inbox
     return d3.select('#ghost')
       .style('left', `${e.sourceEvent.clientX - 10}px`)
       .style('top', `${e.sourceEvent.clientY -25}px`) }
 
-  // -- the inbox --------------------------------------------
+  function mouseToCanvas(e) {
+    let cr = $("#canvas").getBoundingClientRect()
+    return { x: e.sourceEvent.clientX - Math.round(cr.x),
+             y: e.sourceEvent.clientY - Math.round(cr.y)} }
 
   function drawScraps() {
     let scraps = d3.select('#posts').selectAll('p'),
         cached = {piles:[]}
     scraps.data(model.scraps, d=>d._id).join('p').html(d=>d.text).call(d3.drag()
-      .on('start', function (e,d){
+      .on('start', function (e,d){  // d is the scrap
         cached.piles = getPiles()
         d3.select(this).classed('dragging', true)
         ghostToMouse(e,d).style('display','block') })
@@ -140,12 +154,17 @@
         let el = d3.select(this).classed('dragging', false)
         d3.select('#ghost').style('display','none')
         cached.piles.select('rect').transition().duration(250).ease(d3.easeLinear).style('fill', '')
-        let target = cached.piles.select('rect').filter(function(){return isOver(this, e)})
-        if (target.size()) { // -- dragged scrap to a pile
-          let pile = target.data()[0];
-          jFetch(`/s/${d._id}`, 'PUT', {pile: pile._id})
-          model.scraps.pop(i)
-          el.remove() } })) }
+        let target = cached.piles.select('rect').filter(function(){return isOver(this, e)}),
+            dropped = true, toPile=model.pile._id
+        if (target.size()) { toPile = target.data()[0]._id }
+        else if (isOver($("#canvas"), e)) {
+          addScrapToScene(d, mouseToCanvas(e))
+          let p = {...model.pile}; delete p.items // don't store redundant .items info
+          jFetch(`/p/${toPile}`, 'PUT', p)}
+        else dropped = false
+        if (dropped) {
+          jFetch(`/s/${d._id}`, 'PUT', {pile: toPile})
+          el.remove(); model.scraps.splice(i, 1) } })) }
 
   function addScrap() {
     let scrap = $('#notepad').text, text = scrap.value

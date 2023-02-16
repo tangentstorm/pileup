@@ -4,6 +4,8 @@ pileup web backend. mostly middleware to couchdb.
 from quart import Quart, request
 import config
 
+HEX = set("0123456789abcdef")
+
 app = Quart(__name__)
 
 
@@ -21,31 +23,38 @@ async def index():
 
 
 @app.route('/p/', defaults={'pile': '@inbox'})
-@app.route('/p/<pile>', methods=['GET', 'POST'])
-async def inbox(pile):
-    if pile == '@inbox':
-        pile = {'_id': pile}
+@app.route('/p/<key>', methods=['GET', 'PUT', 'POST'])
+async def get_pile(key):
+    if len(key) == 32 and all(ch in HEX for ch in key):
+        pile = (await app.client.find(_id=key))
     else:
-        piles = (await app.client.find(type='pile', text=pile))['docs']
-        if not piles:
-            print("no such pile:", pile)
+        if piles := (await app.client.find(type='pile', text=key))['docs']:
+            # !! what if there's more than one pile with this name? (force unique?)
+            pile = piles[0]
+            key = pile['_id']
+        elif key == '@inbox':
+            pile = {'_id': key}
+        else:
+            print("no such pile:", key)
             return []
-        # !! what if there's more than one pile with this name? (force unique?)
-        pile = piles[0]
     match request.method:
         case 'GET':
-            pile['items'] = (await app.client.find(pile=pile['_id']))['docs']
+            pile['items'] = (await app.client.find(pile=key))['docs']
             return pile
+        case 'PUT':
+            data = await request.json
+            if 'items' in data:
+                del data['items']
+            return await app.client.put(key, **data)
         case 'POST':
             text = (await request.json).get('text')
-            return await app.client.add_scrap(text, pile['_id'])
+            return await app.client.add_scrap(text, key)
 
 
 @app.route('/s/<sid>', methods=['GET', 'PUT'])
 async def scrap(sid):
     docs = (await app.client.find({'_id': sid}))['docs']
     res = docs[0] if docs else {}
-    print(res)
     if res and request.method == 'PUT':
         # only thing you can edit is the pile (for now?)
         req = await request.json

@@ -71,6 +71,23 @@
   //    be to calculate all of foo's ancestors. (TODO?)
   let model = {scraps:[], piles:[], pile:null, crumbs:[HOME]} // pile initialized in gotoPile at bottom
 
+  // -- utils ------------------------------------------------
+
+  $ = document.querySelector
+  $$ = document.querySelectorAll
+
+  function jFetch(url, method, body) { // json-flavored fetch()
+    var req;
+    if (method=='GET' || !method) { req = fetch(url) }
+    else { req = fetch(url,
+      {method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)}) }
+    return req.then(res=>res.json()) }
+
+  function isOver(elem, e) { // did mouse event happen over this element?
+    let r = elem.getBoundingClientRect()
+    let ex = e.sourceEvent.clientX, ey = e.sourceEvent.clientY
+    return (ex >= r.x && ex - r.x < r.width) && (ey >= r.y && ey - r.y < r.height) }
+
   // -- drawing the piles ------------------------------------
 
   pileData = ()=>(model.pile?._id == HOME) ? model.piles : [...model.piles, {_id:HOME, text:HOME}]
@@ -103,18 +120,6 @@
 
   // -- the inbox --------------------------------------------
 
-  function isOver(elem, e) {
-    let r = elem.getBoundingClientRect()
-    let ex = e.sourceEvent.clientX, ey = e.sourceEvent.clientY
-    return (ex >= r.x && ex - r.x < r.width) && (ey >= r.y && ey - r.y < r.height) }
-
-  function jFetch(url, method, body) {
-    var req;
-    if (method=='GET' || !method) { req = fetch(url) }
-    else { req = fetch(url,
-      {method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)}) }
-    return req.then(res=>res.json()) }
-
   function drawScraps() {
     let scraps = d3.select('#posts').selectAll('p'),
         cached = {piles:[]}
@@ -140,7 +145,7 @@
           el.remove() } })) }
 
   function addScrap() {
-    let scrap = document.getElementById('notepad').text, text = scrap.value
+    let scrap = $('#notepad').text, text = scrap.value
     jFetch(`/p/${model.pile._id}`, 'POST', {text}).then(res=>{
       scrap.value = ''
       model.scraps.unshift({_id: res.id, text})

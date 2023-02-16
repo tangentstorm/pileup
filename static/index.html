@@ -18,7 +18,7 @@
     .pile rect { fill: bisque; filter: drop-shadow(3px 5px 2px rgb(0 0 0 / 0.4)) }
     .pile.home rect { fill: #96e9cf }
     .pile rect.droptarget { fill: #bb8749 } /* dummy rule for color skittle in editor */
-    .pile-name { font-weight: bold }
+    .pile .name { font-weight: bold }
     body { font-family: "Calibri" }
     #ghost { position:absolute; left: 0; top:0; width:100px; height: 60px; z-index: 1;
         background: white; border:solid #333 1px; opacity: 90%; display:none;
@@ -70,7 +70,6 @@
   //    crumbs will still say HOME -> foo. The alternative would
   //    be to calculate all of foo's ancestors. (TODO?)
   let model = {scraps:[], piles:[], pile:null, crumbs:[HOME]} // pile initialized in gotoPile at bottom
-  let cached = {piles:[]}
 
   // -- drawing the piles ------------------------------------
 
@@ -81,14 +80,14 @@
     let ofsx = 20, boxw = 300, gapw = 10, cols = 3,
         ofsy = 20, boxh = 180, gaph = 10
     getPiles()
-      .join(enter => {
-          let g = enter.append('g').attr('class','pile').attr('transform', (d,i)=>
-            `translate(${ofsx+i%cols*(boxw+gapw)},${ofsy+Math.floor(i/cols)*(boxh+gaph)})`)
-          g.append('rect').attr('width', boxw).attr('height', boxh)
-          g.append('text').attr('class','pile-name').attr('x',10).attr('y',20).append('a')})
-    // !! why can i not just do .selectAll('text a') here?
-    getPiles('g text a').text(d=>d.text).on('click', (e,d)=>gotoPile(d.text))
-    getPiles().classed('home',d=>d.text==HOME).select('rect').attr('height',d=>d.text==HOME?boxh/2:boxh) }
+      .join('g')
+        .attr('class','pile').attr('transform', (d,i)=>
+          `translate(${ofsx+i%cols*(boxw+gapw)},${ofsy+Math.floor(i/cols)*(boxh+gaph)})`)
+        .html((d,i)=>`
+          <rect width="${boxw}" height="${d.text==HOME?boxh/2:boxh}"></rect>
+          <text class="name" x="10" y="20"><a>${d.text}</a></text>`)
+      .each(function() { d3.select(this).select('text a').on('click', (e,d)=>gotoPile(d.text)) })
+      .classed('home',d=>d.text==HOME) }
 
   function ghostToMouse(e,d) {
       return d3.select('#ghost').style('left',
@@ -109,23 +108,23 @@
     return req.then(res=>res.json()) }
 
   function drawScraps() {
-    let scraps = d3.select('#posts').selectAll('p')
-    let newScraps = scraps.data(model.scraps, d=>d._id).join('p').html(d=>d.text)
-    let cachedPiles = getPiles()
-    newScraps.call(d3.drag()
+    let scraps = d3.select('#posts').selectAll('p'),
+        cached = {piles:[]}
+    scraps.data(model.scraps, d=>d._id).join('p').html(d=>d.text).call(d3.drag()
       .on('start', function (e,d){
+        cached.piles = getPiles()
         d3.select(this).classed('dragging', true)
         ghostToMouse(e,d).style('display','block') })
       .on('drag', (e,d)=>{ ghostToMouse(e,d)
         // now highlight the pile we'd drop to
-        cachedPiles.select('rect').each(function(d,i){
+        cached.piles.select('rect').each(function(d,i){
           d3.select(this).transition().duration(250).ease(d3.easeLinear)
             .style('fill', isOver(this, e) ? '#bb8749' : '') }) })
       .on('end', function (e, d, i){
         let el = d3.select(this).classed('dragging', false)
         d3.select('#ghost').style('display','none')
-        cachedPiles.select('rect').transition().duration(250).ease(d3.easeLinear).style('fill', '')
-        let target = cachedPiles.select('rect').filter(function(){return isOver(this, e)})
+        cached.piles.select('rect').transition().duration(250).ease(d3.easeLinear).style('fill', '')
+        let target = cached.piles.select('rect').filter(function(){return isOver(this, e)})
         if (target.size()) { // -- dragged scrap to a pile
           let pile = target.data()[0];
           jFetch(`/s/${d._id}`, 'PUT', {pile: pile._id})
@@ -159,7 +158,6 @@
             case 'pile': model.piles.push(item); break;
             default: model.scraps.push(item) }}
         drawPiles(); drawScraps(); addMenus() }) }
-
 
   // -- menus -----------------------------------------------
 

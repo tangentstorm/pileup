@@ -73,25 +73,33 @@
 
   // -- drawing the piles ------------------------------------
 
-  function getPiles(sel) {
-    let piles = model.piles; if (model.pile?._id != HOME) piles = [...piles, {_id:HOME, text:HOME}]
-    return d3.select("#canvas").selectAll(sel||'g').data(piles) }
-  function drawPiles() {
+  pileData = ()=>(model.pile?._id == HOME) ? model.piles : [...model.piles, {_id:HOME, text:HOME}]
+  getPiles = sel=> d3.select("#canvas").selectAll(sel||'g').data(pileData())
+
+  function drawPiles() { // default layout if no .scene is present
     let ofsx = 20, boxw = 300, gapw = 10, cols = 3,
         ofsy = 20, boxh = 180, gaph = 10
-    getPiles()
+    drawScene(pileData().map((d,i)=> ({
+      _id: d._id, c: 'pile',
+      x: ofsx + i % cols * (boxw + gapw),
+      y: ofsy + Math.floor(i/cols) * (boxh + gaph),
+      w: boxw, h: d.text==HOME ? boxh/2 : boxh,
+      text: d.text }))) }
+
+  function drawScene(scene) {
+    d3.select('#canvas').selectAll('g').data(scene)
       .join('g')
-        .attr('class','pile').attr('transform', (d,i)=>
-          `translate(${ofsx+i%cols*(boxw+gapw)},${ofsy+Math.floor(i/cols)*(boxh+gaph)})`)
+        .attr('class','pile').attr('transform', d=>`translate(${d.x},${d.y})`)
         .html((d,i)=>`
-          <rect width="${boxw}" height="${d.text==HOME?boxh/2:boxh}"></rect>
+          <rect width="${d.w}" height="${d.h}"></rect>
           <text class="name" x="10" y="20"><a>${d.text}</a></text>`)
       .each(function() { d3.select(this).select('text a').on('click', (e,d)=>gotoPile(d.text)) })
-      .classed('home',d=>d.text==HOME) }
+      .classed('home',d=>d._id==HOME) }
 
   function ghostToMouse(e,d) {
-      return d3.select('#ghost').style('left',
-        `${e.sourceEvent.clientX - 10}px`).style('top', `${e.sourceEvent.clientY -25}px`) }
+    return d3.select('#ghost')
+      .style('left', `${e.sourceEvent.clientX - 10}px`)
+      .style('top', `${e.sourceEvent.clientY -25}px`) }
 
   // -- the inbox --------------------------------------------
 

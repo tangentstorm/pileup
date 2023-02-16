@@ -76,8 +76,8 @@
 
   // -- utils ------------------------------------------------
 
-  $ = document.querySelector
-  $$ = document.querySelectorAll
+  $  = x => document.querySelector(x) // !! "Illegal invocation" w/o arrow
+  $$ = x => document.querySelectorAll(x)
 
   function jFetch(url, method, body) { // json-flavored fetch()
     var req;

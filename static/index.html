@@ -15,7 +15,10 @@
     #posts p.dragging { background: white; opacity: 50% }
     #canvas { position: absolute; left:400px; width: calc(100% - 400px); top: 50px; background: cadetblue;
         height: calc(100% - 50px ); }
-    .pile rect { fill: bisque; filter: drop-shadow(3px 5px 2px rgb(0 0 0 / 0.4)) }
+    g rect { filter: drop-shadow(3px 5px 2px rgb(0 0 0 / 0.4)) }
+    .card rect { fill: aliceblue; }
+    .node rect { fill: white; stroke: #999 }
+    .pile rect { fill: bisque;  }
     .pile.home rect { fill: #96e9cf }
     .pile rect.droptarget { fill: #bb8749 } /* dummy rule for color skittle in editor */
     .pile .name { font-weight: bold }
@@ -93,20 +96,20 @@
   pileData = ()=>(model.pile?._id == HOME) ? model.piles : [...model.piles, {_id:HOME, text:HOME}]
   getPiles = sel=> d3.select("#canvas").selectAll(sel||'g').data(pileData())
 
-  function drawPiles() { // default layout if no .scene is present
+  function defaultScene() { // when no .scene is present
     let ofsx = 20, boxw = 300, gapw = 10, cols = 3,
         ofsy = 20, boxh = 180, gaph = 10
-    drawScene(pileData().map((d,i)=> ({
+    return pileData().map((d,i)=> ({
       _id: d._id, c: 'pile',
       x: ofsx + i % cols * (boxw + gapw),
       y: ofsy + Math.floor(i/cols) * (boxh + gaph),
       w: boxw, h: d.text==HOME ? boxh/2 : boxh,
-      text: d.text }))) }
+      text: d.text })) }
 
   function drawScene(scene) {
     d3.select('#canvas').selectAll('g').data(scene)
       .join('g')
-        .attr('class','pile').attr('transform', d=>`translate(${d.x},${d.y})`)
+        .attr('class',d=>d.c||'node').attr('transform', d=>`translate(${d.x},${d.y})`)
         .html((d,i)=>`
           <rect width="${d.w}" height="${d.h}"></rect>
           <text class="name" x="10" y="20"><a>${d.text}</a></text>`)
@@ -165,12 +168,22 @@
       drawCrumbs() }
     model.scraps = []; model.piles = [];
     jFetch(`/p/${which}`).then(data=>{
-        model.pile = data
-        for (var item of data.items) {
-          switch(item.type) {
-            case 'pile': model.piles.push(item); break;
-            default: model.scraps.push(item) }}
-        drawPiles(); drawScraps(); addMenus() }) }
+      model.pile = data
+      model.piles = data.items.filter(d=>d.type=='pile')
+
+      if (!data.scene) data.scene = defaultScene()
+      let inScene = {} // anything not in the scene is an inbox scrap
+      data.scene.forEach(d=>{ inScene[d._id] = d })
+      model.scraps = []
+      data.items.forEach(d=>{ var ref
+        if (ref = inScene[d._id]) ref.text = d.text
+        else model.scraps.push(d) })
+
+      model.piles.filter(d=>!inScene[d._id]).forEach(d=>{
+        // !! what to do about it? (scrap? auto-add to scene?)
+        console.warn('sub-pile not found in scene:', d) })
+
+      drawScene(data.scene); drawScraps(); addMenus() }) }
 
   // -- menus -----------------------------------------------
 

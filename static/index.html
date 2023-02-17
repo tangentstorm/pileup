@@ -124,7 +124,7 @@
         .html((d,i)=>`
           <rect width="${d.w}" height="${d.h}"></rect>
           <text class="name" x="10" y="20"><a>${d.text}</a></text>`)
-      .each(function() { d3.select(this).select('text a').on('click', (e,d)=>gotoPile(d.text)) })
+      .each(function() { d3.select(this).select('.pile text a').on('click', (e,d)=>gotoPile(d.text)) })
       .classed('home',d=>d._id==HOME) }
 
   function addScrapToScene(scrap, at) {
@@ -238,7 +238,8 @@
         e.preventDefault() })
       .on('mousedown', function(e) {
         if (e.button == 1) {
-          console.log(`middle-click: x: ${e.clientX}, y: ${e.clientY}`) }}) }
+          console.log(`middle-click: x: ${e.clientX}, y: ${e.clientY}`)
+          e.preventDefault() }}) }
 
   // -- dragging on canvas makes a (rectangular) lasso -------
 
@@ -258,8 +259,8 @@
       if (e.sourceEvent.eventPhase != 2) return;
       p0 = mouseToCanvas(e)
       setLasso(p0, p0).style('visibility','visible') })
-    .on('drag', e => setLasso(p0, mouseToCanvas(e)))
-    .on('end', ()=> d3.select('#lasso').style('visibility','hidden')))
+    .on('drag', e => { if (p0) setLasso(p0, mouseToCanvas(e)) })
+    .on('end', ()=> { p0=undefined; d3.select('#lasso').style('visibility','hidden') }))
 
   // -- begin ------------------------------------------------
 

@@ -19,6 +19,7 @@
     .card rect { fill: aliceblue; }
     .card { cursor: grab }
     .card.drag { cursor: grabbing }
+    .card.selected rect { stroke:black; stroke-width: 2; }
     .node rect { fill: white; stroke: #999 }
     .pile rect { fill: bisque;  }
     .pile.home rect { fill: #96e9cf }
@@ -67,7 +68,9 @@
   <g id="lasso" transform="translate(500,300)" style="visibility: hidden">
     <rect class="rope" width="300" height="180" fill="transparent" stroke="#333" stroke-dasharray="4 1"></rect>
     <rect class="rope" width="300" height="180" fill="transparent" stroke="#fff" stroke-dasharray="1 4"></rect>
-    <!-- don't need these for this, but will use same idea for selectangle -->
+  </g>
+  <g id="selectangle" transform="translate(0,0)" style="visibility: hidden">
+    <rect class="rope" width="300" height="180" fill="transparent" stroke="#ccc" stroke-width="2"></rect>
     <rect class="handle n w" x="-4" y="-4" width="9" height="9" fill="#ccc" stroke="#333"></rect>
     <rect class="handle n e" x="295" y="-4" width="9" height="9" fill="#ccc" stroke="#333"></rect>
     <rect class="handle s w" x="-4" y="175" width="9" height="9" fill="#ccc" stroke="#333"></rect>
@@ -103,6 +106,17 @@
     let r = elem.getBoundingClientRect()
     let ex = e.sourceEvent.clientX, ey = e.sourceEvent.clientY
     return (ex >= r.x && ex - r.x < r.width) && (ey >= r.y && ey - r.y < r.height) }
+
+  function overlaps(a, b) { // two DOMRect values from .getBoundingClientRect
+    return (a.left < b.right) && (a.right > b.left)
+        && (a.top < b.bottom) && (a.bottom > b.top) }
+
+  function bounds(rects) {
+    let res = {x:Infinity, y:Infinity, x1:-Infinity, y1:-Infinity}
+    rects.forEach(r=>{
+      res.x = Math.min(res.x, r.x); res.x1=Math.max(res.x1, r.right)
+      res.y = Math.min(res.y, r.y); res.y1=Math.max(res.y1, r.bottom) })
+    return new DOMRect(res.x, res.y, res.x1-res.x, res.y1-res.y) }
 
   // -- drawing the scene ------------------------------------
 
@@ -163,10 +177,12 @@
       .style('left', `${e.sourceEvent.clientX - 10}px`)
       .style('top', `${e.sourceEvent.clientY -25}px`) }
 
-  function mouseToCanvas(e) {
+  function clientToCanvas(p) {
     let cr = $("#canvas").getBoundingClientRect()
-    return { x: e.sourceEvent.clientX - Math.round(cr.x),
-             y: e.sourceEvent.clientY - Math.round(cr.y)} }
+    return { x: Math.round(p.x - cr.x), y: Math.round(p.y - cr.y) }}
+
+  function mouseToCanvas(e) {
+    return clientToCanvas({ x: e.sourceEvent.clientX, y: e.sourceEvent.clientY }) }
 
   function drawScraps() {
     let scraps = d3.select('#posts').selectAll('p'),
@@ -262,10 +278,10 @@
 
   // -- dragging on canvas makes a (rectangular) lasso -------
 
-  function setLasso(a,b) { // draw rectangle with corners a and b
+  function moveBox(selector, a,b) { // draw rectangle with corners a and b
     let x = Math.min(a.x, b.x), w = Math.max(a.x, b.x) - x,
         y = Math.min(a.y, b.y), h = Math.max(a.y, b.y) - y
-    let s = d3.select('#lasso')
+    let s = d3.select(selector)
     s.attr('transform', `translate(${x}, ${y})`)
     s.selectAll('.e').attr('x', w-5)
     s.selectAll('.s').attr('y', h-5)
@@ -277,9 +293,20 @@
     .on('start', function(e){
       if (e.sourceEvent.eventPhase != 2) return;
       p0 = mouseToCanvas(e)
-      setLasso(p0, p0).style('visibility','visible') })
-    .on('drag', e => { if (p0) setLasso(p0, mouseToCanvas(e)) })
-    .on('end', ()=> { p0=undefined; d3.select('#lasso').style('visibility','hidden') }))
+      moveBox('#lasso', p0, p0).style('visibility','visible') })
+    .on('drag', e => { if (p0) moveBox('#lasso', p0, mouseToCanvas(e)) })
+    .on('end', ()=> {
+      p0=undefined
+      let lr = d3.select('#lasso').style('visibility','hidden').node().getBoundingClientRect()
+      d3.selectAll('#scene .card').classed('selected', function() {
+        return overlaps(lr, this.getBoundingClientRect()) })
+      // draw the selectangle around the selected objects:
+      let sel = d3.selectAll('.selected')
+      if (sel.size()) {
+        let r = bounds(sel.nodes().map(x=>x.getBoundingClientRect()))
+        moveBox('#selectangle', clientToCanvas({x:r.left, y:r.top}), clientToCanvas({x:r.right, y:r.bottom}))
+          .style('visibility','visible') }
+      else d3.select('#selectangle').style('visibility', 'hidden') }))
 
   // -- begin ------------------------------------------------
 

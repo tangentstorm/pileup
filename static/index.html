@@ -17,6 +17,8 @@
         height: calc(100% - 50px ); }
     #scene rect { filter: drop-shadow(3px 5px 2px rgb(0 0 0 / 0.4)) }
     .card rect { fill: aliceblue; }
+    .card { cursor: grab }
+    .card.drag { cursor: grabbing }
     .node rect { fill: white; stroke: #999 }
     .pile rect { fill: bisque;  }
     .pile.home rect { fill: #96e9cf }
@@ -125,16 +127,34 @@
           <rect width="${d.w}" height="${d.h}"></rect>
           <text class="name" x="10" y="20"><a>${d.text}</a></text>`)
       .each(function() { d3.select(this).select('.pile text a').on('click', (e,d)=>gotoPile(d.text)) })
-      .classed('home',d=>d._id==HOME) }
+      .classed('home',d=>d._id==HOME)
+      .call(makeDraggable)}
+
+  function makeDraggable(d3s) {
+    let start = {x:0, y:0}
+    let fn = d3.drag()
+      .on('start', function(e,d){
+        let p = mouseToCanvas(e)
+        start = { x:p.x-d.x, y:p.y-d.y}})
+      .on('drag', function(e,d){
+        let p = mouseToCanvas(e)
+        d.x = p.x-start.x, d.y = p.y-start.y // both this.__data__ and model.pile.scene
+        d3.select(this).attr('transform', `translate(${d.x},${d.y})`) })
+      .on('end', storeScene)
+    fn(d3s.filter(d=>d.c!='pile')) }
 
   function addScrapToScene(scrap, at) {
-    console.log('addscrap', scrap, at)
     let scene = model.pile.scene
     let card = {_id: scrap._id, c:"card", ...at, w:200, h:30, text:scrap.text }
     scene.push(card) // !! draw twice. second time we'll know the correct width
     let newCard = drawScene(scene).filter(d=>d._id == scrap._id)
     card.w = 20 + Math.round(newCard.select('text').node().getBBox().width)
     drawScene(scene) }
+
+  function storeScene() {
+    let p = {...model.pile}; delete p.items // don't store redundant .items info
+    jFetch(`/p/${model.pile._id}`, 'PUT', p)
+      .then(r=>{ model.pile._rev = r.rev; }) }
 
   // -- the inbox --------------------------------------------
 
@@ -170,8 +190,7 @@
         if (target.size()) { toPile = target.data()[0]._id }
         else if (isOver($("#canvas"), e)) {
           addScrapToScene(d, mouseToCanvas(e))
-          let p = {...model.pile}; delete p.items // don't store redundant .items info
-          jFetch(`/p/${toPile}`, 'PUT', p)}
+          storeScene()}
         else dropped = false
         if (dropped) {
           jFetch(`/s/${d._id}`, 'PUT', {pile: toPile})

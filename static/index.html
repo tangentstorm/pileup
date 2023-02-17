@@ -142,7 +142,7 @@
           <text class="name" x="10" y="20"><a>${d.text}</a></text>`)
       .each(function() { d3.select(this).select('.pile text a').on('click', (e,d)=>gotoPile(d.text)) })
       .classed('home',d=>d._id==HOME)
-      .call(makeDraggable)}
+      .filter(d=>d.c!='pile').call(makeDraggable)}
 
   function makeDraggable(d3s) {
     let start = {x:0, y:0}
@@ -155,7 +155,7 @@
         d.x = p.x-start.x, d.y = p.y-start.y // both this.__data__ and model.pile.scene
         d3.select(this).attr('transform', `translate(${d.x},${d.y})`) })
       .on('end', storeScene)
-    fn(d3s.filter(d=>d.c!='pile')) }
+    fn(d3s) }
 
   function addScrapToScene(scrap, at) {
     let scene = model.pile.scene
@@ -307,6 +307,28 @@
         moveBox('#selectangle', clientToCanvas({x:r.left, y:r.top}), clientToCanvas({x:r.right, y:r.bottom}))
           .style('visibility','visible') }
       else d3.select('#selectangle').style('visibility', 'hidden') }))
+
+  // -- dragging selectangle drags all selected --------------
+  // let p0 // already defined above for canvas
+  let s0 // initial position of the selectangle
+  function dragSelection(el, e, bake){
+    let p = mouseToCanvas(e)
+    let q = {x:p.x-p0.x, y:p.y-p0.y}
+    let r = {x:q.x-s0.x, y:q.y-s0.y} // relative distance since start of drag
+    d3.select(el).attr('transform', `translate(${q.x},${q.y})`)
+    d3.selectAll('.selected').attr('transform', d=>{
+      let x = d.x+r.x, y = d.y+r.y
+      if (bake) { d.x=x; d.y=y }
+      return `translate(${x},${y})` })
+    if (bake) storeScene() }
+
+  d3.select('#selectangle').call(d3.drag()
+    .on('start', function(e){
+        let p = mouseToCanvas(e)
+        s0 = clientToCanvas(d3.select('#selectangle').node().getBoundingClientRect())
+        p0 = { x:p.x-s0.x, y:p.y-s0.y}})
+      .on('drag', function(e) { dragSelection(this, e, 0) })
+      .on('end', function(e) { dragSelection(this, e, 1) }))
 
   // -- begin ------------------------------------------------
 

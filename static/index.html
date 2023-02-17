@@ -15,7 +15,7 @@
     #posts p.dragging { background: white; opacity: 50% }
     #canvas { position: absolute; left:400px; width: calc(100% - 400px); top: 50px; background: cadetblue;
         height: calc(100% - 50px ); }
-    g rect { filter: drop-shadow(3px 5px 2px rgb(0 0 0 / 0.4)) }
+    #scene rect { filter: drop-shadow(3px 5px 2px rgb(0 0 0 / 0.4)) }
     .card rect { fill: aliceblue; }
     .node rect { fill: white; stroke: #999 }
     .pile rect { fill: bisque;  }
@@ -36,6 +36,7 @@
     .ctx ul { padding: 0; margin: 0; }
     .ctx li { display: block; padding:5px; margin:0; }
     .ctx li:hover { background: #444; cursor: default }
+    #lasso .handle { visibility: hidden }
   </style>
 </head>
 <body>
@@ -60,6 +61,16 @@
 </div>
 
 <svg id="canvas">
+  <g id="scene"></g>
+  <g id="lasso" transform="translate(500,300)" style="visibility: hidden">
+    <rect class="rope" width="300" height="180" fill="transparent" stroke="#333" stroke-dasharray="4 1"></rect>
+    <rect class="rope" width="300" height="180" fill="transparent" stroke="#fff" stroke-dasharray="1 4"></rect>
+    <!-- don't need these for this, but will use same idea for selectangle -->
+    <rect class="handle n w" x="-4" y="-4" width="9" height="9" fill="#ccc" stroke="#333"></rect>
+    <rect class="handle n e" x="295" y="-4" width="9" height="9" fill="#ccc" stroke="#333"></rect>
+    <rect class="handle s w" x="-4" y="175" width="9" height="9" fill="#ccc" stroke="#333"></rect>
+    <rect class="handle s e" x="295" y="175" width="9" height="9" fill="#ccc" stroke="#333"></rect>
+  </g>
 </svg>
 
 <dialog id="ctx-menu" class="ctx">
@@ -94,7 +105,7 @@
   // -- drawing the scene ------------------------------------
 
   pileData = ()=>(model.pile?._id == HOME) ? model.piles : [...model.piles, {_id:HOME, text:HOME}]
-  getPiles = sel=> d3.select("#canvas").selectAll(sel||'g').data(pileData())
+  getPiles = sel=> d3.select("#scene").selectAll(sel||'g').data(pileData())
 
   function defaultScene() { // when no .scene is present
     let ofsx = 20, boxw = 300, gapw = 10, cols = 3,
@@ -107,7 +118,7 @@
       text: d.text })) }
 
   function drawScene(scene) {
-    return d3.select('#canvas').selectAll('g').data(scene)
+    return d3.select('#scene').selectAll('g').data(scene)
       .join('g')
         .attr('class',d=>d.c||'node').attr('transform', d=>`translate(${d.x},${d.y})`)
         .html((d,i)=>`
@@ -216,7 +227,7 @@
     menu.node().show() }
 
   function addMenus() {
-    d3.selectAll('#canvas, #posts p, #canvas g').on('click', function(e) {
+    d3.selectAll('#canvas, #posts p, #scene g').on('click', function(e) {
         d3.select('#ctx-menu').node().close()
         e.preventDefault(); })
       .on('contextmenu', function(e) {
@@ -228,6 +239,27 @@
       .on('mousedown', function(e) {
         if (e.button == 1) {
           console.log(`middle-click: x: ${e.clientX}, y: ${e.clientY}`) }}) }
+
+  // -- dragging on canvas makes a (rectangular) lasso -------
+
+  function setLasso(a,b) { // draw rectangle with corners a and b
+    let x = Math.min(a.x, b.x), w = Math.max(a.x, b.x) - x,
+        y = Math.min(a.y, b.y), h = Math.max(a.y, b.y) - y
+    let s = d3.select('#lasso')
+    s.attr('transform', `translate(${x}, ${y})`)
+    s.selectAll('.e').attr('x', w-5)
+    s.selectAll('.s').attr('y', h-5)
+    s.selectAll('.rope').attr('width', w).attr('height', h)
+    return s }
+
+  let p0
+  d3.select('#canvas').call(d3.drag()
+    .on('start', function(e){
+      if (e.sourceEvent.eventPhase != 2) return;
+      p0 = mouseToCanvas(e)
+      setLasso(p0, p0).style('visibility','visible') })
+    .on('drag', e => setLasso(p0, mouseToCanvas(e)))
+    .on('end', ()=> d3.select('#lasso').style('visibility','hidden')))
 
   // -- begin ------------------------------------------------
 

@@ -293,10 +293,10 @@
           .style('left', `${x}px`).style('top', `${y}px`),
         options = [
           [`tag: ${node.tagName}`,ok],
-          ['edit', d=>{
+          ['edit', ()=>{
             d3.select('#editor').style('display','block')
               .attr('x',d.x).attr('y',d.y).attr('width',d.w).attr('height',d.h)
-            d3.select('#editor input').attr('value', d.o.text)
+            d3.select('#editor input').each(function() { this.value = d.o.text })
               .on('blur', hideEditor)
               .on('keyup', function(e) {
                 if (e.keyCode == 13) { hideEditor(); this.dispatchEvent(new Event('change')) }

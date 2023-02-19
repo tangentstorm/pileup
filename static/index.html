@@ -149,19 +149,28 @@
           <text class="name" x="10" y="20"><a>${d.o.text}</a></text>`)
       .each(function() { d3.select(this).select('.pile text a').on('click', (e,d)=>gotoPile(d.o.text)) })
       .classed('home',d=>d._id==HOME)
-      .filter(d=>d.c!='pile').call(makeDraggable)}
+      .filter(d=>d.c!='pile').call(makeCardMouseHandler)}
 
-  function makeDraggable(d3s) {
-    let start = {x:0, y:0}
+  function makeCardMouseHandler(d3s) {
+    let start = {x:0, y:0}, dragged
     let fn = d3.drag()
       .on('start', function(e,d){
-        let p = mouseToCanvas(e)
+        let p = mouseToCanvas(e); dragged=0
         start = { x:p.x-d.x, y:p.y-d.y}})
       .on('drag', function(e,d){
-        let p = mouseToCanvas(e)
+        let p = mouseToCanvas(e); dragged=1
         d.x = p.x-start.x, d.y = p.y-start.y // both this.__data__ and model.pile.scene
         d3.select(this).attr('transform', `translate(${d.x},${d.y})`) })
-      .on('end', storeScene)
+      .on('end', function(e,d) {
+        if (dragged) storeScene()
+        else { // single click
+          if (e.sourceEvent.shiftKey) {
+            let node = d3.select(this) // toggle selection state:
+            node.classed('selected', !node.classed('selected')) }
+          else d3.selectAll('#scene g').classed('selected', dd=>dd._id==d._id)
+          updateSelectangle() }})
+    // !! double click also triggers drag-end without further work.
+    // d3s.on('dblclick', e=> { console.log('dblclick') })
     fn(d3s) }
 
   function addScrapToScene(scrap, at) {
@@ -220,10 +229,10 @@
   function drawScraps() {
     let scraps = d3.select('#posts').selectAll('p'),
         cached = {piles:[]}
+    // dragging scraps from inbox to canvas
     scraps.data(model.scraps, d=>d._id).join('p').html(d=>d.text).call(d3.drag()
       .on('start', function (e,d){  // d is the scrap
         cached.piles = getPiles()
-        d3.select(this).classed('dragging', true)
         ghostToMouse(e,d).style('display','block') })
       .on('drag', (e,d)=>{ ghostToMouse(e,d)
         // now highlight the pile we'd drop to
@@ -343,7 +352,7 @@
     s.selectAll('.rope').attr('width', w).attr('height', h)
     return s }
 
-  let p0
+  let p0 // -- register lasso handler on canvas
   d3.select('#canvas').call(d3.drag()
     .on('start', function(e){
       if (e.sourceEvent.eventPhase != 2) return;
@@ -355,13 +364,16 @@
       let lr = d3.select('#lasso').style('visibility','hidden').node().getBoundingClientRect()
       d3.selectAll('#scene .card').classed('selected', function() {
         return overlaps(lr, this.getBoundingClientRect()) })
-      // draw the selectangle around the selected objects:
-      let sel = d3.selectAll('.selected')
-      if (sel.size()) {
-        let r = bounds(sel.nodes().map(x=>x.getBoundingClientRect()))
-        moveBox('#selectangle', clientToCanvas({x:r.left, y:r.top}), clientToCanvas({x:r.right, y:r.bottom}))
-          .style('visibility','visible') }
-      else d3.select('#selectangle').style('visibility', 'hidden') }))
+      updateSelectangle() }))
+
+  function updateSelectangle() {
+    // draw the selectangle around '.selected' objects
+    let sel = d3.selectAll('.selected')
+    if (sel.size()) {
+      let r = bounds(sel.nodes().map(x=>x.getBoundingClientRect()))
+      moveBox('#selectangle', clientToCanvas({x:r.left, y:r.top}), clientToCanvas({x:r.right, y:r.bottom}))
+        .style('visibility','visible') }
+    else d3.select('#selectangle').style('visibility', 'hidden') }
 
   // -- dragging selectangle drags all selected --------------
   // let p0 // already defined above for canvas
@@ -382,8 +394,21 @@
         let p = mouseToCanvas(e)
         s0 = clientToCanvas(d3.select('#selectangle').node().getBoundingClientRect())
         p0 = { x:p.x-s0.x, y:p.y-s0.y}})
-      .on('drag', function(e) { dragSelection(this, e, 0) })
-      .on('end', function(e) { dragSelection(this, e, 1) }))
+    .on('drag', function(e) { dragSelection(this, e, 0) })
+    .on('end', function(e) { dragSelection(this, e, 1) }));
+
+  (function() { // -- resize selection using selectangle
+    let p0, sel, dragged
+    d3.selectAll('#selectangle .handle').call(d3.drag()
+      .on('start', function(e) { sel = d3.select('.selected'); p0 = mouseToCanvas(e); dragged=0 })
+      .on('drag', function(e) { dragged = 1
+        let p = mouseToCanvas(e)
+        if (sel.size()==1) { // dragging handles on a single item resizes the item
+          let d = sel.data()[0], handle = d3.select(this)
+          if (handle.classed('e')) { d.w += e.dx; sel.select('rect').attr('width', d.w) }
+          if (handle.classed('s')) { d.h += e.dy; sel.select('rect').attr('height', d.h) }
+          updateSelectangle() }})
+      .on('end', storeScene)) })()
 
   // -- begin ------------------------------------------------
 

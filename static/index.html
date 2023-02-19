@@ -14,10 +14,10 @@
     #posts p { min-height: 30px; background: aliceblue; padding:10px; }
     #posts p.dragging { background: white; opacity: 50% }
     #canvas { position: absolute; left:400px; width: calc(100% - 400px); top: 50px; background: cadetblue;
-        height: calc(100% - 50px ); }
+      height: calc(100% - 50px ); }
     #scene rect { filter: drop-shadow(3px 5px 2px rgb(0 0 0 / 0.4)) }
     .card rect { fill: aliceblue; }
-    .card { cursor: grab }
+    .card { cursor: default }
     .card.drag { cursor: grabbing }
     .card.selected rect { stroke:black; stroke-width: 2; }
     .node rect { fill: white; stroke: #999 }
@@ -27,8 +27,8 @@
     .pile .name { font-weight: bold }
     body { font-family: "Calibri" }
     #ghost { position:absolute; left: 0; top:0; width:100px; height: 60px; z-index: 1;
-        background: white; border:solid #333 1px; opacity: 90%; display:none;
-        box-shadow: #00000033 5px 5px 3px 3px; }
+      background: white; border:solid #333 1px; opacity: 90%; display:none;
+      box-shadow: #00000033 5px 5px 3px 3px; }
     #crumbs { display: inline-block; padding:0; margin:0; position:relative; top:-15px; }
     #crumbs li { display: inline; }
     #crumbs li:before { content: " → "; font-family: "consolas"; color: white !important; }
@@ -40,6 +40,9 @@
     .ctx li { display: block; padding:5px; margin:0; }
     .ctx li:hover { background: #444; cursor: default }
     #lasso .handle { visibility: hidden }
+    #editor { display:none }
+    #editor input { width:100%; height:100%; padding:2px; margin:0; border: solid black 2px;
+      color:white; background:#333 }
   </style>
 </head>
 <body>
@@ -76,6 +79,9 @@
     <rect class="handle s w" x="-4" y="175" width="9" height="9" fill="#ccc" stroke="#333"></rect>
     <rect class="handle s e" x="295" y="175" width="9" height="9" fill="#ccc" stroke="#333"></rect>
   </g>
+  <foreignObject id="editor" height="30" width="150">
+    <input type="text" value=""/>
+  </foreignObject>
 </svg>
 
 <dialog id="ctx-menu" class="ctx">
@@ -133,7 +139,8 @@
       w: boxw, h: d.text==HOME ? boxh/2 : boxh,
       text: d.text })) }
 
-  function drawScene(scene) {
+  function drawScene() {
+    let scene = model.pile.scene
     return d3.select('#scene').selectAll('g').data(scene)
       .join('g')
         .attr('class',d=>d.c||'node').attr('transform', d=>`translate(${d.x},${d.y})`)
@@ -159,11 +166,15 @@
 
   function addScrapToScene(scrap, at) {
     let scene = model.pile.scene
-    let card = {_id: scrap._id, c:"card", ...at, w:200, h:30, text:scrap.text }
-    scene.push(card) // !! draw twice. second time we'll know the correct width
-    let newCard = drawScene(scene).filter(d=>d._id == scrap._id)
-    card.w = 20 + Math.round(newCard.select('text').node().getBBox().width)
-    drawScene(scene) }
+    // !! we can't calculate real width until we put it in the scene
+    scene.push({_id: scrap._id, c:"card", ...at, w:200, h:30, o:scrap })
+    let newCard = drawScene().filter(d=>d._id == scrap._id)
+    resizeD3Card(newCard)}
+
+  function resizeD3Card(d3Card) {
+    let d = d3Card.data()[0]
+    d.w = 20 + Math.round(d3Card.select('text').node().getBBox().width)
+    d3Card.select('rect').attr('width', d.w) }
 
   function storeScene() {
     let p = {...model.pile}; delete p.items // don't store redundant .items info
@@ -172,13 +183,25 @@
     return jFetch(`/p/${model.pile._id}`, 'PUT', p)
       .then(r=>{ model.pile._rev = r.rev; }) }
 
-  function updateNode(id, kw) { // -> promise
+  // !! should I just use the couch id as the html id?
+  function sceneElem(id) { return d3.selectAll('#scene g').filter(d=>d._id == id) }
+
+  function updateNode(id, kw) {
     let ref = model.pile.items.find(x=>x._id == id)
     if (ref) {
+      let old = { type: ref.type, text: ref.text }
       Object.assign(ref, kw)
-      return jFetch(`/s/${id}`, 'PUT', ref).then(res=>{
-        Object.assign(ref, {_rev: res.rev}) })}
-    else (console.warn(`tried to update non-existant node: ${id}`)) }
+      jFetch(`/s/${id}`, 'PUT', ref).then(res=>{
+        Object.assign(ref, res)
+        if (ref.type != old.type || ref.text != old.text){
+          let d3Card = sceneElem(id)
+          d3Card.data()[0].c = ref.type
+          d3Card.select('text').text(ref.text)
+          resizeD3Card(d3Card);
+          storeScene() }
+        // draw scene to update text:
+        drawScene() })}
+    else (console.warn(`tried to update non-existent node: ${id}`)) }
 
   // -- the inbox --------------------------------------------
 
@@ -258,37 +281,45 @@
         // !! what to do about it? (scrap? auto-add to scene?)
         console.warn('sub-pile not found in scene:', d) })
 
-      drawScene(data.scene); drawScraps(); addMenus() }) }
+      drawScene(); drawScraps(); addMenus() }) }
 
   // -- menus -----------------------------------------------
 
   let ok = ()=>{}
+  function hideEditor() { d3.select('#editor').style('display','none') }
   function ctxMenu(x,y,node) {
     let d = node.__data__,
         menu = d3.select('#ctx-menu')
           .style('left', `${x}px`).style('top', `${y}px`),
-        options = [[`tag: ${node.tagName}`,ok]]
+        options = [
+          [`tag: ${node.tagName}`,ok],
+          ['edit', d=>{
+            d3.select('#editor').style('display','block')
+              .attr('x',d.x).attr('y',d.y).attr('width',d.w).attr('height',d.h)
+            d3.select('#editor input').attr('value', d.o.text)
+              .on('blur', hideEditor)
+              .on('keyup', function(e) {
+                if (e.keyCode == 13) { hideEditor(); this.dispatchEvent(new Event('change')) }
+                else if (e.keyCode == 27 ) { this.value = d.o.text; hideEditor() }})
+              .on('change', e=> { if (this.value != d.o.text) updateNode(d._id, {text:e.target.value}) })
+              .node().focus() }]]
     let t = d?.c || 'scrap'; switch (t) {
       case 'card':
         options.push(['convert to pile', d=>{
-          updateNode(d._id, {type:'pile'})
-            .then (()=>{
-              d.c = 'pile'
-              drawScene(model.pile.scene)
-              storeScene() }) }])
+          updateNode(d._id, {type:'pile'}) }])
         break
       default: }
 
     if (d) options.unshift([`${t} ${d._id}`, ok])
     menu.selectAll('li').data(options).join('li').text(dd=>dd[0])
-      .on('click', (e,dd)=>{ dd[1](d) })
+      .on('click', (e,dd)=>{ hideMenu(); dd[1](d) })
     menu.node().show() }
 
+  function hideMenu() { d3.select('#ctx-menu').node().close() }
   function addMenus() {
     d3.select('#ctx-menu').on('contextmenu', e=>e.preventDefault())
-    d3.selectAll('#canvas, #posts p, #scene g, #selectangle').on('click', function(e) {
-        d3.select('#ctx-menu').node().close()
-        e.preventDefault(); })
+    d3.selectAll('#canvas, #posts p, #scene g, #selectangle')
+      .on('click', e=> { hideMenu(); e.preventDefault() })
       .on('contextmenu', function(e) {
         // !! phase 2 is the 'target' phase for dom events, when it hits the actual element
         //    (without this check, #canvas would override rect events in phase 3 ('bubbling'))

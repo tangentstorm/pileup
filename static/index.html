@@ -15,16 +15,18 @@
     #posts p.dragging { background: white; opacity: 50% }
     #canvas { position: absolute; left:400px; width: calc(100% - 400px); top: 50px; background: cadetblue;
       height: calc(100% - 50px ); }
-    #scene rect { filter: drop-shadow(3px 5px 2px rgb(0 0 0 / 0.4)) }
-    .card rect { fill: aliceblue; }
+    rect { fill: transparent; }
+    .card rect { fill: aliceblue; filter: drop-shadow(3px 5px 2px rgb(0 0 0 / 0.4)); }
     .card { cursor: default }
     .card.drag { cursor: grabbing }
     .card.selected rect { stroke:black; stroke-width: 2; }
-    .node rect { fill: white; stroke: #999 }
-    .pile rect { fill: bisque;  }
+    .node rect { fill: #ccc; stroke: #0e3f4c }
+    .pile rect { fill: bisque;  stroke: #37879c; rx:5; }
     .pile.home rect { fill: #96e9cf }
     .pile rect.droptarget { fill: #bb8749 } /* dummy rule for color skittle in editor */
     .pile .name { font-weight: bold }
+    .list rect { fill: #0e3f4c; rx:10; }
+    .list text { fill: cadetblue }
     body { font-family: "Calibri" }
     #ghost { position:absolute; left: 0; top:0; width:100px; height: 60px; z-index: 1;
       background: white; border:solid #333 1px; opacity: 90%; display:none;
@@ -151,7 +153,7 @@
           <text class="name" x="10" y="20"><a>${d.o.text}</a></text>`)
       .each(function() { d3.select(this).select('.pile text a').on('click', (e,d)=>gotoPile(d.o.text)) })
       .classed('home',d=>d._id==HOME)
-      .filter(d=>d.c!='pile').call(makeCardMouseHandler)}
+      .filter(d=>d.c!='pile' && d.c!='list').call(makeCardMouseHandler)}
 
   function makeCardMouseHandler(d3s) {
     let start = {x:0, y:0}, dragged

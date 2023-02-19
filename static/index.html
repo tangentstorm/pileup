@@ -39,6 +39,8 @@
     .ctx ul { padding: 0; margin: 0; }
     .ctx li { display: block; padding:5px; margin:0; }
     .ctx li:hover { background: #444; cursor: default }
+    .ctx li.type { font-weight: bold; text-align:center; border-bottom: solid #666 1px; }
+    .ctx li.type:hover { background: #333; cursor: default }
     #lasso .handle { visibility: hidden }
     #editor { display:none }
     #editor input { width:100%; height:100%; padding:2px; margin:0; border: solid black 2px;
@@ -298,29 +300,33 @@
   function hideEditor() { d3.select('#editor').style('display','none') }
   function ctxMenu(x,y,node) {
     let d = node.__data__,
-        menu = d3.select('#ctx-menu')
-          .style('left', `${x}px`).style('top', `${y}px`),
-        options = [
-          [`tag: ${node.tagName}`,ok],
-          ['edit', ()=>{
-            d3.select('#editor').style('display','block')
-              .attr('x',d.x).attr('y',d.y).attr('width',d.w).attr('height',d.h)
-            d3.select('#editor input').each(function() { this.value = d.o.text })
-              .on('blur', hideEditor)
-              .on('keyup', function(e) {
-                if (e.keyCode == 13) { hideEditor(); this.dispatchEvent(new Event('change')) }
-                else if (e.keyCode == 27 ) { this.value = d.o.text; hideEditor() }})
-              .on('change', e=> { if (this.value != d.o.text) updateNode(d._id, {text:e.target.value}) })
-              .node().focus() }]]
-    let t = d?.c || 'scrap'; switch (t) {
-      case 'card':
-        options.push(['convert to pile', d=>{
-          updateNode(d._id, {type:'pile'}) }])
-        break
-      default: }
+        t = d? d.c || 'scrap' : node.id=='selectangle' ? 'selection' : `&lt;${node.tagName}&gt;`,
+        menu = d3.select('#ctx-menu').style('left', `${x}px`).style('top', `${y}px`),
+        options = [[`${t}`,ok]]
 
-    if (d) options.unshift([`${t} ${d._id}`, ok])
-    menu.selectAll('li').data(options).join('li').text(dd=>dd[0])
+    if (t=='selection') { // menu on selection of 1 item -> just show item's menu
+      let sel = d3.selectAll('#scene .selected')
+      if (sel.size() == 1) { return ctxMenu(x,y,sel.node())}}
+
+    // -- otherwise build item-specific menu:
+    if (d?._id) options.push([`copy id: ${d._id}`, d=>
+      navigator.clipboard.writeText(d._id).then(_=>console.log('copied id: ', d._id))])
+    if (d) options.push(['edit', ()=>{
+      d3.select('#editor').style('display','block')
+        .attr('x',d.x).attr('y',d.y).attr('width',d.w).attr('height',d.h)
+      d3.select('#editor input').each(function() { this.value = d.o.text })
+        .on('blur', hideEditor)
+        .on('keyup', function(e) {
+          if (e.keyCode == 13) { hideEditor(); this.dispatchEvent(new Event('change')) }
+          else if (e.keyCode == 27 ) { this.value = d.o.text; hideEditor() }})
+        .on('change', e=> { if (this.value != d.o.text) updateNode(d._id, {text:e.target.value}) })
+        .node().focus() }])
+    if (d && t!='pile') {
+        options.push(['convert to pile', d=>{
+          updateNode(d._id, {type:'pile'}) }]) }
+    // -- now draw the menu --
+    menu.selectAll('li').data(options).join('li').html(dd=>dd[0])
+      .classed('type', (d,i)=>i==0)
       .on('click', (e,dd)=>{ hideMenu(); dd[1](d) })
     menu.node().show() }
 

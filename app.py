@@ -54,14 +54,12 @@ async def get_pile(key):
 @app.route('/s/<sid>', methods=['GET', 'PUT'])
 async def scrap(sid):
     docs = (await app.client.find({'_id': sid}))['docs']
-    res = docs[0] if docs else {}
-    if res and request.method == 'PUT':
-        # only thing you can edit is the pile (for now?)
+    doc = docs[0] if docs else {}
+    if doc and request.method == 'PUT':
         req = await request.json
-        if pile := req.get('pile'):
-            res['pile'] = pile
-            res = await app.client.put(sid, **res)
-    return res
+        # !! should I whitelist fields here?
+        doc = await app.client.put(sid, **req)
+    return doc
 
 
 if __name__ == '__main__':

@@ -121,7 +121,7 @@
   // -- drawing the scene ------------------------------------
 
   pileData = ()=>(model.pile?._id == HOME) ? model.piles : [...model.piles, {_id:HOME, text:HOME}]
-  getPiles = sel=> d3.select("#scene").selectAll(sel||'g').data(pileData())
+  getPiles = sel=> d3.select("#scene").selectAll(sel||'g').data(pileData(), d=>d._id)
 
   function defaultScene() { // when no .scene is present
     let ofsx = 20, boxw = 300, gapw = 10, cols = 3,
@@ -139,8 +139,8 @@
         .attr('class',d=>d.c||'node').attr('transform', d=>`translate(${d.x},${d.y})`)
         .html((d,i)=>`
           <rect width="${d.w}" height="${d.h}"></rect>
-          <text class="name" x="10" y="20"><a>${d.text}</a></text>`)
-      .each(function() { d3.select(this).select('.pile text a').on('click', (e,d)=>gotoPile(d.text)) })
+          <text class="name" x="10" y="20"><a>${d.o.text}</a></text>`)
+      .each(function() { d3.select(this).select('.pile text a').on('click', (e,d)=>gotoPile(d.o.text)) })
       .classed('home',d=>d._id==HOME)
       .filter(d=>d.c!='pile').call(makeDraggable)}
 
@@ -167,8 +167,18 @@
 
   function storeScene() {
     let p = {...model.pile}; delete p.items // don't store redundant .items info
-    jFetch(`/p/${model.pile._id}`, 'PUT', p)
+    // only store the things that can't be derived from the items themselves:
+    p.scene = p.scene.map(o => ({_id:o._id, c:o.c, x:o.x, y:o.y, w:o.w, h:o.h }) )
+    return jFetch(`/p/${model.pile._id}`, 'PUT', p)
       .then(r=>{ model.pile._rev = r.rev; }) }
+
+  function updateNode(id, kw) { // -> promise
+    let ref = model.pile.items.find(x=>x._id == id)
+    if (ref) {
+      Object.assign(ref, kw)
+      return jFetch(`/s/${id}`, 'PUT', ref).then(res=>{
+        Object.assign(ref, {_rev: res.rev}) })}
+    else (console.warn(`tried to update non-existant node: ${id}`)) }
 
   // -- the inbox --------------------------------------------
 
@@ -240,9 +250,9 @@
       let inScene = {} // anything not in the scene is an inbox scrap
       data.scene.forEach(d=>{ inScene[d._id] = d })
       model.scraps = []
-      data.items.forEach(d=>{ var ref
-        if (ref = inScene[d._id]) ref.text = d.text
-        else model.scraps.push(d) })
+      if (model.pile._id !== HOME) { inScene[HOME].o = { text: HOME } }
+      data.items.forEach(d=>{ let ref = inScene[d._id]
+        if (ref) { ref.o = d } else model.scraps.push(d) })
 
       model.piles.filter(d=>!inScene[d._id]).forEach(d=>{
         // !! what to do about it? (scrap? auto-add to scene?)
@@ -252,17 +262,31 @@
 
   // -- menus -----------------------------------------------
 
+  let ok = ()=>{}
   function ctxMenu(x,y,node) {
     let d = node.__data__,
         menu = d3.select('#ctx-menu')
           .style('left', `${x}px`).style('top', `${y}px`),
-        options = [`tag: ${node.tagName}`]
-    if (d) options.unshift(`type: ${d.type ? d.type : 'scrap'}`, `id: ${d._id}`)
-    menu.selectAll('li').data(options).join('li').text(d=>d)
+        options = [[`tag: ${node.tagName}`,ok]]
+    let t = d?.c || 'scrap'; switch (t) {
+      case 'card':
+        options.push(['convert to pile', d=>{
+          updateNode(d._id, {type:'pile'})
+            .then (()=>{
+              d.c = 'pile'
+              drawScene(model.pile.scene)
+              storeScene() }) }])
+        break
+      default: }
+
+    if (d) options.unshift([`${t} ${d._id}`, ok])
+    menu.selectAll('li').data(options).join('li').text(dd=>dd[0])
+      .on('click', (e,dd)=>{ dd[1](d) })
     menu.node().show() }
 
   function addMenus() {
-    d3.selectAll('#canvas, #posts p, #scene g').on('click', function(e) {
+    d3.select('#ctx-menu').on('contextmenu', e=>e.preventDefault())
+    d3.selectAll('#canvas, #posts p, #scene g, #selectangle').on('click', function(e) {
         d3.select('#ctx-menu').node().close()
         e.preventDefault(); })
       .on('contextmenu', function(e) {

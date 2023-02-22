@@ -260,7 +260,8 @@
           storeScene()}
         else dropped = false
         if (dropped) {
-          jFetch(`/s/${d._id}`, 'PUT', {pile: toPile})
+          d.pile = toPile
+          jFetch(`/s/${d._id}`, 'PUT', d) // !! TODO: handle version conflicts
           el.remove(); model.scraps.splice(i, 1) } })) }
 
   function addScrap() {

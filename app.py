@@ -1,7 +1,8 @@
 """
 pileup web backend. mostly middleware to couchdb.
 """
-from quart import Quart, request
+from quart import Quart, request, Response
+import json
 import config
 
 HEX = set("0123456789abcdef")
@@ -51,14 +52,21 @@ async def get_pile(key):
             return await app.client.add_scrap(text, key)
 
 
+def json_error(code, msg):
+    return Response(json.dumps({"error": msg}), status=code, mimetype='application/json')
+
+
 @app.route('/s/<sid>', methods=['GET', 'PUT'])
 async def scrap(sid):
     docs = (await app.client.find({'_id': sid}))['docs']
     doc = docs[0] if docs else {}
     if doc and request.method == 'PUT':
         req = await request.json
-        # !! should I whitelist fields here?
-        doc = await app.client.put(sid, **req)
+        # !! should I whitelist fields here? for now, merge in anything
+        if not "_rev" in req:
+            return json_error(409, "no _rev provided")
+        doc.update(req)
+        doc = await app.client.put(sid, **doc)
     return doc
 
 

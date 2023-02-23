@@ -237,9 +237,11 @@
 
   function drawScraps() {
     let scraps = d3.select('#posts').selectAll('p'),
-        cached = {piles:[]}
+        cached = {piles:[]},
+        sceneKeys = new Set(model.pile.scene.map(d=>d._id)),
+        scrapData = model.pile.items.filter(d=>!sceneKeys.has(d._id))
     // dragging scraps from inbox to canvas
-    scraps.data(model.scraps, d=>d._id).join('p').html(d=>d.text).call(d3.drag()
+    scraps.data(scrapData, d=>d._id).join('p').html(d=>d.text).call(d3.drag()
       .on('start', function (e,d){  // d is the scrap
         cached.piles = getPiles()
         ghostToMouse(e,d).style('display','block') })
@@ -262,13 +264,13 @@
         if (dropped) {
           d.pile = toPile
           jFetch(`/s/${d._id}`, 'PUT', d) // !! TODO: handle version conflicts
-          el.remove(); model.scraps.splice(i, 1) } })) }
+          el.remove() } })) }
 
   function addScrap() {
     let scrap = $('#notepad').text, text = scrap.value
     jFetch(`/p/${model.pile._id}`, 'POST', {text}).then(res=>{
       scrap.value = ''
-      model.scraps.unshift({_id: res.id, text})
+      model.items.unshift({_id: res.id, _rev:res.rev, text})
       drawScraps() }) }
 
   function drawCrumbs() {
@@ -283,7 +285,7 @@
       else { model.crumbs.push(which) }
       model.pile = {_id: which} // temp
       drawCrumbs() }
-    model.scraps = []; model.piles = [];
+    model.piles = [];
     jFetch(`/p/${which}`).then(data=>{
       model.pile = data
       model.piles = data.items.filter(d=>d.type=='pile')
@@ -291,10 +293,8 @@
       if (!data.scene) data.scene = defaultScene()
       let inScene = {} // anything not in the scene is an inbox scrap
       data.scene.forEach(d=>{ inScene[d._id] = d })
-      model.scraps = []
       if (model.pile._id !== HOME) { inScene[HOME].o = { text: HOME } }
-      data.items.forEach(d=>{ let ref = inScene[d._id]
-        if (ref) { ref.o = d } else model.scraps.push(d) })
+      data.items.forEach(d=>{ let ref = inScene[d._id]; if (ref) ref.o = d })
 
       model.piles.filter(d=>!inScene[d._id]).forEach(d=>{
         // !! what to do about it? (scrap? auto-add to scene?)

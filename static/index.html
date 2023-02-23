@@ -327,7 +327,9 @@
         ['edit', editNode],
         ['to inbox', nodeToInbox])
       if (t!='pile') options.push(['convert to pile', d=>{
-          updateNode(d._id, {type:'pile'}) }]) }
+          updateNode(d._id, {type:'pile'}) }])
+      if (t!='list') options.push(['convert to list', d=>{
+          updateNode(d._id, {type:'list'}) }]) }
 
     // -- now draw the menu --
     menu.selectAll('li').data(options).join('li').html(dd=>dd[0])

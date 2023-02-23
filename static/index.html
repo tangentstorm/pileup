@@ -305,7 +305,7 @@
   // -- menus -----------------------------------------------
 
   let ok = ()=>{}
-  function hideEditor() { d3.select('#editor').style('display','none') }
+
   function ctxMenu(x,y,node) {
     let d = node.__data__,
         t = d? d.c || 'scrap' : node.id=='selectangle' ? 'selection' : `&lt;${node.tagName}&gt;`,
@@ -320,21 +320,15 @@
         ['align right', alignRightEdges] )}
 
     // -- otherwise build item-specific menu:
-    if (d?._id) options.push([`copy id: ${d._id}`, d=>
-      navigator.clipboard.writeText(d._id).then(_=>console.log('copied id: ', d._id))])
-    if (d) options.push(['edit', ()=>{
-      d3.select('#editor').style('display','block')
-        .attr('x',d.x).attr('y',d.y).attr('width',d.w).attr('height',d.h)
-      d3.select('#editor input').each(function() { this.value = d.o.text })
-        .on('blur', hideEditor)
-        .on('keyup', function(e) {
-          if (e.keyCode == 13) { hideEditor(); this.dispatchEvent(new Event('change')) }
-          else if (e.keyCode == 27 ) { this.value = d.o.text; hideEditor() }})
-        .on('change', e=> { if (this.value != d.o.text) updateNode(d._id, {text:e.target.value}) })
-        .node().focus() }])
-    if (d && t!='pile') {
-        options.push(['convert to pile', d=>{
+    if (d) {
+      if (d._id) options.push([`copy id: ${d._id}`, d=>
+        navigator.clipboard.writeText(d._id).then(_=>console.log('copied id: ', d._id))])
+      options.push(
+        ['edit', editNode],
+        ['to inbox', nodeToInbox])
+      if (t!='pile') options.push(['convert to pile', d=>{
           updateNode(d._id, {type:'pile'}) }]) }
+
     // -- now draw the menu --
     menu.selectAll('li').data(options).join('li').html(dd=>dd[0])
       .classed('type', (d,i)=>i==0)
@@ -359,6 +353,27 @@
             updateSelectangle() }
           else console.log(`middle-click: x: ${e.clientX}, y: ${e.clientY}`)
           e.preventDefault() }}) }
+
+  // -- node commands ----------------------------------------
+
+  function hideEditor() { d3.select('#editor').style('display','none') }
+
+  function editNode(d) {
+    d3.select('#editor').style('display','block')
+      .attr('x',d.x).attr('y',d.y).attr('width',d.w).attr('height',d.h)
+    d3.select('#editor input').each(function() { this.value = d.o.text })
+      .on('blur', hideEditor)
+      .on('keyup', function(e) {
+        if (e.keyCode == 13) { hideEditor(); this.dispatchEvent(new Event('change')) }
+        else if (e.keyCode == 27 ) { this.value = d.o.text; hideEditor() }})
+      .on('change', e=> { if (this.value != d.o.text) updateNode(d._id, {text:e.target.value}) })
+      .node().focus() }
+
+  function nodeToInbox(d) {
+    let ix = model.pile.scene.findIndex(dd=>dd._id==d._id)
+    if (ix>-1) {
+      model.pile.scene.splice(ix,1)
+      drawScene(); drawScraps(); storeScene() }}
 
   // -- dragging on canvas makes a (rectangular) lasso -------
 

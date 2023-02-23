@@ -144,7 +144,7 @@
       text: d.text })) }
 
   function drawScene() {
-    let scene = model.pile.scene
+    let scene = model.pile.scene // no key in .data call so we can move to front/back
     return d3.select('#scene').selectAll('g').data(scene)
       .join('g')
         .attr('class',d=>d.c||'node').attr('transform', d=>`translate(${d.x},${d.y})`)
@@ -312,12 +312,16 @@
         menu = d3.select('#ctx-menu').style('left', `${x}px`).style('top', `${y}px`),
         options = [[`${t}`,ok]]
 
-    if (t=='selection') { // menu on selection of 1 item -> just show item's menu
-      let sel = d3.selectAll('#scene .selected')
-      if (sel.size() == 1) { return ctxMenu(x,y,sel.node())}
-      else options.push(
+    if (t=='selection') {
+      // !! should menu on selection of 1 item just show item's menu?
+      //    maybe, but 'move to back' and 'move to front' work on whole selection.
+      //let sel = d3.selectAll('#scene .selected')
+      //if (sel.size() == 1) { return ctxMenu(x,y,sel.node())}
+      options.push(
         ['align left', alignLeftEdges],
-        ['align right', alignRightEdges] )}
+        ['align right', alignRightEdges],
+        ['move to back', moveToBack],
+        ['move to front', moveToFront])}
 
     // -- otherwise build item-specific menu:
     if (d) {
@@ -472,6 +476,19 @@
   function alignRightEdges() {
     let maxX = selectangleBounds().right -5;
     withSelection(d=>{d.x = (maxX-d.w)})}
+
+  function moveToBack(d, flip) {
+    let ids = new Set(getSelection().map(d=>d._id)),
+        partition = {true:[], false:[]}
+    model.pile.scene.forEach(d=>partition[ids.has(d._id)].push(d))
+    model.pile.scene = flip
+      ? partition.false.concat(partition.true)
+      : partition.true.concat(partition.false)
+    drawScene();
+    d3.selectAll('#scene g').classed('selected', d=>ids.has(d._id))
+    updateSelectangle(); storeScene() }
+
+  function moveToFront(d) { moveToBack(d, 1) }
 
   // -- begin ------------------------------------------------
 

@@ -270,7 +270,7 @@
     let scrap = $('#notepad').text, text = scrap.value
     jFetch(`/p/${model.pile._id}`, 'POST', {text}).then(res=>{
       scrap.value = ''
-      model.items.unshift({_id: res.id, _rev:res.rev, text})
+      model.pile.items.unshift({_id: res.id, _rev:res.rev, text})
       drawScraps() }) }
 
   function drawCrumbs() {

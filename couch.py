@@ -11,13 +11,17 @@ class CouchDBClient:
         self.url = f'http://{user}:{pswd}@{host}:{port}/{db}'
 
     async def find(self, selector=None, **kw):
-        q = {'selector': selector or kw, 'sort': [{'ts': 'desc'}]}
+        q = {'selector': selector or kw, 'sort': [{'ts': 'desc'}], 'limit': 100}
         async with self.sess.post(f'{self.url}/_find', json=q) as r:
             return await r.json()
 
-    async def add_scrap(self, text: str, pile: str = '@inbox'):
+    async def add_scrap(self, text: str, pile: str = '@home'):
         when = datetime.now().isoformat()
         async with self.sess.post(f'{self.url}', json={'text': text, 'pile': pile, 'ts': when}) as r:
+            return await r.json()
+
+    async def get(self, path):
+        async with self.sess.get(f'{self.url}/{path}') as r:
             return await r.json()
 
     async def put(self, path, **obj):

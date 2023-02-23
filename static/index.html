@@ -94,7 +94,7 @@
 
 <script>
 
-  const HOME = '@inbox'
+  const HOME = '@home'
   // !! if we start at #foo and foo is not a child of @home, the
   //    crumbs will still say HOME -> foo. The alternative would
   //    be to calculate all of foo's ancestors. (TODO?)
@@ -150,7 +150,7 @@
         .attr('class',d=>d.c||'node').attr('transform', d=>`translate(${d.x},${d.y})`)
         .html((d,i)=>`
           <rect width="${d.w}" height="${d.h}"></rect>
-          <text class="name" x="10" y="20"><a>${d.o.text}</a></text>`)
+          <text class="name" x="10" y="20"><a>${d?.o?.text}</a></text>`)
       .each(function() { d3.select(this).select('.pile text a').on('click', (e,d)=>gotoPile(d.o.text)) })
       .classed('home',d=>d._id==HOME)
       .filter(d=>d.c!='pile' && d.c!='list').call(makeCardMouseHandler)}

@@ -23,18 +23,18 @@ async def index():
     return await app.send_static_file('index.html')
 
 
-@app.route('/p/', defaults={'pile': '@inbox'})
+@app.route('/p/', defaults={'pile': '@home'})
 @app.route('/p/<key>', methods=['GET', 'PUT', 'POST'])
 async def get_pile(key):
     if len(key) == 32 and all(ch in HEX for ch in key):
-        pile = (await app.client.find(_id=key))
+        pile = await app.client.get(key)
     else:
         if piles := (await app.client.find(type='pile', text=key))['docs']:
             # !! what if there's more than one pile with this name? (force unique?)
             pile = piles[0]
             key = pile['_id']
-        elif key == '@inbox':
-            pile = {'_id': key}
+        elif key == '@home':
+            pile = await app.client.get(key)
         else:
             print("no such pile:", key)
             return []

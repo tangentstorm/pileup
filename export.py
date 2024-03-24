@@ -45,10 +45,10 @@ def fresh_db():
     create view pile as select * from item where ty='pile';
 
     create view page as
-      select p.tx ptx,c.tx ctx,c.ty,s.c,c.pi,c.id ci,s.x,s.y,s.w,s.h
+      select p.tx pg,c.tx tx,c.ty,s.c,c.pi,c.id ci,s.z,s.x,s.y,s.w,s.h
       from (item p left join item c on p.id=c.pi)
         left join scene s on p.id=s.pi and c.id=s.ci
-      where p.ty='pile' order by p.tx,s.pi,c.tx""")
+      where p.ty='pile' order by (s.pi is null),p.tx,s.z,c.tx""")
   dbc.commit()
   return dbc
 
@@ -83,12 +83,15 @@ def map_scenes(dbc):
   cur.execute("select oi,os from item where os is not null")
   for [oi,os] in cur.fetchall():
       scn = json.loads(os)
-      for row in scn:
+      for (z, row) in enumerate(scn):
         if not row.get('c'): row['c'] = ''
         row['pi'] = P[oi]
         row['ci'] = P[row['_id']]
-        cur.execute("insert into scene (pi,ci,x,y,w,h,c) "
-                    "values (:pi,:ci,:x,:y,:w,:h,:c)", row)
+        row['w'] = round(row['w'], 2)
+        row['h'] = round(row['w'], 2)
+        row['z'] = z
+        cur.execute("insert into scene (pi,ci,x,y,w,h,c,z) "
+                    "values (:pi,:ci,:x,:y,:w,:h,:c,:z)", row)
   dbc.commit()
 
 def drop_old_columns(dbc):

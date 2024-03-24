@@ -88,7 +88,7 @@ def map_scenes(dbc):
         row['pi'] = P[oi]
         row['ci'] = P[row['_id']]
         row['w'] = round(row['w'], 2)
-        row['h'] = round(row['w'], 2)
+        row['h'] = round(row['h'], 2)
         row['z'] = z
         cur.execute("insert into scene (pi,ci,x,y,w,h,c,z) "
                     "values (:pi,:ci,:x,:y,:w,:h,:c,:z)", row)

@@ -20,8 +20,8 @@ def fresh_db():
       os text, -- old scene json
       id integer primary key,
       pi integer not null references item(id) default -1,
-      ty text, -- type
-      tx text, -- text
+      ty text not null default '', -- type
+      tx text not null, -- text
       ts datetime default current_timestamp);
 
     create index item_tx on item(tx);
@@ -39,13 +39,13 @@ def fresh_db():
       z integer not null default 0,
       w real not null,
       h real not null,
-      c text,
+      c text not null default '',
       unique(pi, ci));
 
     create view pile as select * from item where ty='pile';
 
     create view page as
-      select p.tx ptx,c.tx ctx,c.pi,c.id ci,s.c,s.x,s.y,s.w,s.h,s.c
+      select p.tx ptx,c.tx ctx,c.ty,s.c,c.pi,c.id ci,s.x,s.y,s.w,s.h
       from (item p left join item c on p.id=c.pi)
         left join scene s on p.id=s.pi and c.id=s.ci
       where p.ty='pile' order by p.tx,s.pi,c.tx""")
@@ -58,7 +58,7 @@ def copy_items(dbc, items):
     scn=it.get('scene')
     sjs=json.dumps(scn) if scn else None
     cur.execute('insert into item (oi,op,os,ty,tx,ts) values (?,?,?,?,?,?)',
-                (it.get('_id'),it.get('pile'),sjs,it.get('type'),it.get('text'),it.get('ts')))
+                (it.get('_id'),it.get('pile'),sjs,it.get('type',''),it.get('text',''),it.get('ts')))
   dbc.commit()
 
 def fix_parents(dbc):
